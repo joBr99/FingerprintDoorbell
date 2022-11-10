@@ -687,6 +687,7 @@ void setup()
 
 void loop()
 {
+  delay(1);
   // shouldReboot flag for supporting reboot through webui
   if (shouldReboot) {
     reboot();
