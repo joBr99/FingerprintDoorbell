@@ -6,6 +6,10 @@
 	path = main/libs/AsyncTCP
 	url = https://github.com/me-no-dev/AsyncTCP.git
 
+[submodule "main/libs/ESPAsyncWebServer"]
+	path = main/libs/ESPAsyncWebServer
+	url = git@github.com:me-no-dev/ESPAsyncWebServer.git
+
 [submodule "main/libs/AsyncElegantOTA"]
 	path = main/libs/AsyncElegantOTA
 	url = https://github.com/ayushsharma82/AsyncElegantOTA.git
@@ -13,9 +17,12 @@
 [submodule "main/libs/pubsubclient"]
 	path = main/libs/pubsubclient
 	url = https://github.com/knolleary/pubsubclient.git
+
 [submodule "main/libs/Adafruit-Fingerprint-Sensor-Library"]
 	path = main/libs/Adafruit-Fingerprint-Sensor-Library
 	url = https://github.com/adafruit/Adafruit-Fingerprint-Sensor-Library.git
+	
 [submodule "main/libs/arduino-crypto"]
 	path = main/libs/arduino-crypto
 	url = https://github.com/intrbiz/arduino-crypto.git
+
