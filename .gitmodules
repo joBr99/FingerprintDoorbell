@@ -8,7 +8,7 @@
 
 [submodule "main/libs/ESPAsyncWebServer"]
 	path = main/libs/ESPAsyncWebServer
-	url = git@github.com:me-no-dev/ESPAsyncWebServer.git
+	url = https://github.com/me-no-dev/ESPAsyncWebServer.git
 
 [submodule "main/libs/AsyncElegantOTA"]
 	path = main/libs/AsyncElegantOTA
