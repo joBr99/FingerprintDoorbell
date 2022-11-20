@@ -15,7 +15,7 @@
 
 enum class Mode { scan, enroll, wificonfig, maintenance };
 
-const char* VersionInfo = "0.4";
+const char* VersionInfo = "0.41";
 
 // ===================================================================================================================
 // Caution: below are not the credentials for connecting to your home network, they are for the Access Point mode!!!
@@ -28,6 +28,8 @@ const long  gmtOffset_sec = 0; // UTC Time
 const int   daylightOffset_sec = 0; // UTC Time
 const int   doorbellOutputPin = 19; // pin connected to the doorbell (when using hardware connection instead of mqtt to ring the bell)
 
+
+//#define CUSTOM_GPIOS
 #ifdef CUSTOM_GPIOS
   const int   customOutput1 = 18; // not used internally, but can be set over MQTT
   const int   customOutput2 = 26; // not used internally, but can be set over MQTT
@@ -35,7 +37,27 @@ const int   doorbellOutputPin = 19; // pin connected to the doorbell (when using
   const int   customInput2 = 22; // not used internally, but changes are published over MQTT
   bool customInput1Value = false;
   bool customInput2Value = false;
+  bool triggerCustomOutput1 = false;
+  bool triggerCustomOutput2 = false;
+
+  // Timer stuff Custom_GPIOS
+  unsigned long prevCustomOutput1Time = 0;
+  unsigned long prevCustomOutput2Time = 0;
+  const unsigned long customOutput1TriggerTime = 4 * 1000UL; //Trigger 4000ms
+  const unsigned long customOutput2TriggerTime = 4 * 1000UL; 
 #endif
+
+// Timer stuff Fingerprint
+  unsigned long prevFingerprintOKTime = 0;
+  unsigned long prevFingerprintFalseTime = 0;
+  const unsigned long FingerprintOKTime = 2 * 1000UL; //Trigger 2000ms
+  const unsigned long FingerprintFalseTime = 2 * 1000UL; 
+
+// Timer DoorBell
+bool triggerDoorbell = false;
+unsigned long prevDoorbellTime = 0;  
+const unsigned long doorbellTriggerTime = 1 * 1000UL; //Trigger 1000ms
+  
 
 const int logMessagesCount = 5;
 String logMessages[logMessagesCount]; // log messages, 0=most recent log message
@@ -469,10 +491,20 @@ void mqttCallback(char* topic, byte* message, unsigned int length) {
     }
   }
 
+  if (String(topic) == String(settingsManager.getAppSettings().mqttRootTopic) + "/LedTouchRing") {
+    if(messageTemp == "on"){
+      fingerManager.setLedTouchRing(true);
+    }
+    else if(messageTemp == "off"){
+      fingerManager.setLedTouchRing(false);
+    }
+  }
+
   #ifdef CUSTOM_GPIOS
     if (String(topic) == String(settingsManager.getAppSettings().mqttRootTopic) + "/customOutput1") {
       if(messageTemp == "on"){
-        digitalWrite(customOutput1, HIGH); 
+        triggerCustomOutput1 = true;
+        //digitalWrite(customOutput1, HIGH);         
       }
       else if(messageTemp == "off"){
         digitalWrite(customOutput1, LOW); 
@@ -480,7 +512,8 @@ void mqttCallback(char* topic, byte* message, unsigned int length) {
     }
     if (String(topic) == String(settingsManager.getAppSettings().mqttRootTopic) + "/customOutput2") {
       if(messageTemp == "on"){
-        digitalWrite(customOutput2, HIGH); 
+        triggerCustomOutput2 = true;
+        //digitalWrite(customOutput2, HIGH); 
       }
       else if(messageTemp == "off"){
         digitalWrite(customOutput2, LOW); 
@@ -488,6 +521,44 @@ void mqttCallback(char* topic, byte* message, unsigned int length) {
     }
   #endif  
 
+}
+
+#ifdef CUSTOM_GPIOS
+void doCustomOutputs(){
+  if (triggerCustomOutput1 == true){
+    triggerCustomOutput1 = false;
+    prevCustomOutput1Time = millis(); 
+    digitalWrite(customOutput1, HIGH);    
+  }
+  if (triggerCustomOutput2 == true){
+    triggerCustomOutput2 = false;
+    prevCustomOutput2Time = millis(); 
+    digitalWrite(customOutput2, HIGH);    
+  }
+  
+  if (digitalRead(customOutput1) == true && (millis() - prevCustomOutput1Time >= customOutput1TriggerTime))
+	{		
+    digitalWrite(customOutput1, LOW);
+  }
+  if (digitalRead(customOutput2) == true && (millis() - prevCustomOutput2Time >= customOutput2TriggerTime))
+	{	
+    digitalWrite(customOutput2, LOW);
+  }  
+}
+#endif
+
+void doDoorbell(){
+  if (triggerDoorbell == true){
+    triggerDoorbell = false;
+    prevDoorbellTime = millis(); 
+    digitalWrite(doorbellOutputPin, HIGH);    
+  }  
+  
+  if (digitalRead(doorbellOutputPin) == true && (millis() - prevDoorbellTime >= doorbellTriggerTime))
+	{		
+    digitalWrite(doorbellOutputPin, LOW);
+  }
+  
 }
 
 void connectMqttClient() {
@@ -509,6 +580,7 @@ void connectMqttClient() {
       Serial.println("connected");
       // Subscribe
       mqttClient.subscribe((settingsManager.getAppSettings().mqttRootTopic + "/ignoreTouchRing").c_str(), 1); // QoS = 1 (at least once)
+      mqttClient.subscribe((settingsManager.getAppSettings().mqttRootTopic + "/LedTouchRing").c_str(), 1); // QoS = 1 (at least once)
       #ifdef CUSTOM_GPIOS
         mqttClient.subscribe((settingsManager.getAppSettings().mqttRootTopic + "/customOutput1").c_str(), 1); // QoS = 1 (at least once)
         mqttClient.subscribe((settingsManager.getAppSettings().mqttRootTopic + "/customOutput2").c_str(), 1); // QoS = 1 (at least once)
@@ -557,21 +629,22 @@ void doScan()
           notifyClients("Security issue! Match was not sent by MQTT because of invalid sensor pairing! This could potentially be an attack! If the sensor is new or has been replaced by you do a (re)pairing in settings page.");
         }
       }
-      delay(3000); // wait some time before next scan to let the LED blink
+      delay(2000); // i hate delays // wait some time before next scan to let the LED blink
       break;
     case ScanResult::noMatchFound:
       notifyClients(String("No Match Found (Code ") + match.returnCode + ")");
       if (match.scanResult != lastMatch.scanResult) {
-        digitalWrite(doorbellOutputPin, HIGH);
+        triggerDoorbell = true;
+        //digitalWrite(doorbellOutputPin, HIGH);
         mqttClient.publish((String(mqttRootTopic) + "/ring").c_str(), "on");
         mqttClient.publish((String(mqttRootTopic) + "/matchId").c_str(), "-1");
         mqttClient.publish((String(mqttRootTopic) + "/matchName").c_str(), "");
         mqttClient.publish((String(mqttRootTopic) + "/matchConfidence").c_str(), "-1");
         Serial.println("MQTT message sent: ring the bell!");
-        delay(1000);
-        digitalWrite(doorbellOutputPin, LOW); 
+        delay(2000);
+        //digitalWrite(doorbellOutputPin, LOW); 
       } else {
-        delay(1000); // wait some time before next scan to let the LED blink
+        //delay(100); // wait some time before next scan to let the LED blink
       }
       break;
     case ScanResult::error:
@@ -657,7 +730,7 @@ void setup()
         mqttConfigValid = false;
         notifyClients("Error: No MQTT Broker is configured! Please go to settings and enter your server URL + user credentials.");
       } else {
-        delay(5000);
+        delay(1000);
         IPAddress mqttServerIp;
         if (WiFi.hostByName(settingsManager.getAppSettings().mqttServer.c_str(), mqttServerIp))
         {
@@ -673,7 +746,7 @@ void setup()
         }
       }
       if (fingerManager.connected)
-        fingerManager.setLedRingReady();
+        fingerManager.setLedRingReady();              
       else
         fingerManager.setLedRingError();
     }  else {
@@ -742,6 +815,8 @@ void loop()
   if (needMaintenanceMode)
     currentMode = Mode::maintenance;
 
+doDoorbell();
+
   #ifdef CUSTOM_GPIOS
     // read custom inputs and publish by MQTT
     bool i1;
@@ -763,6 +838,8 @@ void loop()
         else
           mqttClient.publish((String(mqttRootTopic) + "/customInput2").c_str(), "off");  
     }
+    
+    doCustomOutputs();
 
     customInput1Value = i1;
     customInput2Value = i2;

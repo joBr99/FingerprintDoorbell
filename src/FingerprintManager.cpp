@@ -10,13 +10,13 @@ bool FingerprintManager::connect() {
 
     Serial.println("\n\nAdafruit finger detect test");
 
-    // set the data rate for the sensor serial port
-    finger.begin(57600);
+    // set the data rate for the sensor serial port    
+    finger.begin(57600);        
     delay(50);
     if (finger.verifyPassword()) {
         Serial.println("Found fingerprint sensor!");
     } else {
-        delay(5000); // wait a bit longer for sensor to start before 2nd try (usually after a OTA-Update the esp32 is faster with startup than the fingerprint sensor)
+        delay(5000); // wait a bit longer for sensor to start before 2nd try (usually after a OTA-Update the esp32 is faster with startup than the fingerprint sensor)        
         if (finger.verifyPassword()) { 
           Serial.println("Found fingerprint sensor!");
         } else {
@@ -24,8 +24,8 @@ bool FingerprintManager::connect() {
           connected = false;
           return connected;
         }
-    }
-    finger.LEDcontrol(FINGERPRINT_LED_FLASHING, 25, FINGERPRINT_LED_BLUE, 0); // sensor connected signal
+    }   
+    finger.LEDcontrol(FINGERPRINT_LED_FLASHING, 25, FINGERPRINT_LED_BLUE, 0); // sensor connected signal    
 
     Serial.println(F("Reading sensor parameters"));
     finger.getParameters();
@@ -54,7 +54,7 @@ void FingerprintManager::updateTouchState(bool touched)
       // check if sensor or ring is touched
       if (touched) {
         // turn touch indicator on:
-        finger.LEDcontrol(FINGERPRINT_LED_FLASHING, 25, FINGERPRINT_LED_RED, 0);
+        finger.LEDcontrol(FINGERPRINT_LED_FLASHING, 8, FINGERPRINT_LED_WHITE, 0);
       } else {
         // turn touch indicator off:
         setLedRingReady();
@@ -189,7 +189,7 @@ Match FingerprintManager::scanFingerprint() {
     match.returnCode = finger.fingerSearch();
     if (match.returnCode == FINGERPRINT_OK) {
         // found a match!
-        finger.LEDcontrol(FINGERPRINT_LED_ON, 0, FINGERPRINT_LED_PURPLE);
+        finger.LEDcontrol(FINGERPRINT_LED_ON, 0, FINGERPRINT_LED_GREEN);
         
         match.scanResult = ScanResult::matchFound;
         match.matchId = finger.fingerID;
@@ -202,6 +202,8 @@ Match FingerprintManager::scanFingerprint() {
     } else if (match.returnCode == FINGERPRINT_NOTFOUND) {
         Serial.println(String("Did not find a match. (Scan #") + scanPass + String(" of 5)"));
         match.scanResult = ScanResult::noMatchFound;
+        // turn touch indicator to error:
+        finger.LEDcontrol(FINGERPRINT_LED_FLASHING, 25, FINGERPRINT_LED_RED, 0);
         if (scanPass < 5) // max 5 Scans until no match found is given back as result
           doAnotherScan = true;
 
@@ -417,13 +419,27 @@ String FingerprintManager::getFingerListAsHtmlOptionList() {
   return htmlOptions;
 }
 
+void FingerprintManager::setLedTouchRing(bool state) {
+  if (LedTouchRing != state) {
+    LedTouchRing = state;
+    if (state == true)
+      notifyClients("LedTouchRing is now 'on'");
+    else{
+      notifyClients("LedTouchRing is now 'off'");
+    }
+      setLedRingReady();
+  }
+}
+
 void FingerprintManager::setIgnoreTouchRing(bool state) {
   if (ignoreTouchRing != state) {
     ignoreTouchRing = state;
     if (state == true)
       notifyClients("IgnoreTouchRing is now 'on'");
-    else
+    else{
       notifyClients("IgnoreTouchRing is now 'off'");
+    }
+    setLedRingReady();
   }
 }
 
@@ -456,11 +472,16 @@ void FingerprintManager::setLedRingWifiConfig() {
 }
 
 void FingerprintManager::setLedRingReady() {
+  if (LedTouchRing){
   if (!ignoreTouchRing)
-    finger.LEDcontrol(FINGERPRINT_LED_BREATHING, 250, FINGERPRINT_LED_BLUE);
+    //finger.LEDcontrol(FINGERPRINT_LED_ON, 0, FINGERPRINT_LED_CYAN);
+    finger.LEDcontrol(FINGERPRINT_LED_BREATHING, 250, FINGERPRINT_LED_BLUE);	    
+    else
+    finger.LEDcontrol(FINGERPRINT_LED_ON, 0, FINGERPRINT_LED_BLUE); // Indicator switched off
+  }
   else
-    finger.LEDcontrol(FINGERPRINT_LED_ON, 0, FINGERPRINT_LED_BLUE); // just an indicator for me to see if touch ring is active or not
-}
+    finger.LEDcontrol(FINGERPRINT_LED_OFF, 0, FINGERPRINT_LED_BLUE); // just an indicator for me to see if touch ring is active or not
+}	
 
 bool FingerprintManager::deleteAll() {
   if (finger.emptyDatabase() == FINGERPRINT_OK)
