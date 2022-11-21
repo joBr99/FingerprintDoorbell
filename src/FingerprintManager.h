@@ -10,6 +10,22 @@
 #define FINGERPRINT_WRITENOTEPAD 0x18 // Write Notepad on sensor
 #define FINGERPRINT_READNOTEPAD 0x19 // Read Notepad from sensor
 
+#ifndef FINGERPRINT_LED_GREEN
+#define FINGERPRINT_LED_GREEN 0x04       //!< Green LED
+#endif
+
+#ifndef FINGERPRINT_LED_YELLOW
+#define FINGERPRINT_LED_YELLOW 0x05      //!< Yellow LED
+#endif
+
+#ifndef FINGERPRINT_LED_CYAN
+#define FINGERPRINT_LED_CYAN 0x06        //!< Cyan LED
+#endif
+
+#ifndef FINGERPRINT_LED_WHITE
+#define FINGERPRINT_LED_WHITE 0x07       //!< White LED
+#endif
+
 
 /*
   By using the touch ring as an additional input to the image sensor the sensitivity is much higher for door bell ring events. Unfortunately
