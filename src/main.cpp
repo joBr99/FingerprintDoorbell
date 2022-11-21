@@ -26,7 +26,7 @@ IPAddress   WifiConfigIp(192, 168, 4, 1); // IP of access point in wifi config m
 
 const long  gmtOffset_sec = 0; // UTC Time
 const int   daylightOffset_sec = 0; // UTC Time
-const int   doorbellOutputPin = 19; // pin connected to the doorbell (when using hardware connection instead of mqtt to ring the bell)
+
 
 
 //#define CUSTOM_GPIOS
@@ -53,13 +53,16 @@ const int   doorbellOutputPin = 19; // pin connected to the doorbell (when using
   const unsigned long FingerprintOKTime = 2 * 1000UL; //Trigger 2000ms
   const unsigned long FingerprintFalseTime = 2 * 1000UL; 
 
+#ifdef DOORBELL_FEATURE
 // Timer DoorBell
 bool triggerDoorbell = false;
 unsigned long prevDoorbellTime = 0;  
 const unsigned long doorbellTriggerTime = 1 * 1000UL; //Trigger 1000ms
+const int   doorbellOutputPin = 19; // pin connected to the doorbell (when using hardware connection instead of mqtt to ring the bell)
+#endif
   
 
-const int logMessagesCount = 5;
+const int logMessagesCount = 10;
 String logMessages[logMessagesCount]; // log messages, 0=most recent log message
 bool shouldReboot = false;
 unsigned long wifiReconnectPreviousMillis = 0;
@@ -107,7 +110,9 @@ String getLogMessagesAsHtml() {
 String getTimestampString(){
   struct tm timeinfo;
   if(!getLocalTime(&timeinfo)){
+    #ifdef DEBUG
     Serial.println("Failed to obtain time");
+    #endif
     return "no time";
   }
   
@@ -168,7 +173,9 @@ String processor(const String& var){
 // send LastMessage to websocket clients
 void notifyClients(String message) {
   String messageWithTimestamp = "[" + getTimestampString() + "]: " + message;
+  #ifdef DEBUG
   Serial.println(messageWithTimestamp);
+  #endif
   addLogMessage(messageWithTimestamp);
   events.send(getLogMessagesAsHtml().c_str(),"message",millis(),1000);
   
@@ -177,7 +184,9 @@ void notifyClients(String message) {
 }
 
 void updateClientsFingerlist(String fingerlist) {
+  #ifdef DEBUG
   Serial.println("New fingerlist was sent to clients");
+  #endif
   events.send(fingerlist.c_str(),"fingerlist",millis(),1000);
 }
 
@@ -208,7 +217,9 @@ bool checkPairingValid() {
        // first boot, do pairing automatically so the user does not have to do this manually
        return doPairing();
      } else {
+      #ifdef DEBUG
       Serial.println("Pairing has been invalidated previously.");   
+      #endif
       return false;
      }
    }
@@ -243,15 +254,21 @@ bool initWifi() {
   int counter = 0;
   while (WiFi.status() != WL_CONNECTED) {
     delay(1000);
+    #ifdef DEBUG
     Serial.println("Waiting for WiFi connection...");
+    #endif
     counter++;
     if (counter > 30)
       return false;
   }
+  #ifdef DEBUG
   Serial.println("Connected!");
+  #endif
 
   // Print ESP32 Local IP Address
+  #ifdef DEBUG
   Serial.println(WiFi.localIP());
+  #endif
 
   return true;
 }
@@ -264,8 +281,10 @@ void initWiFiAccessPointForConfiguration() {
   // provided IP to all DNS request
   dnsServer.start(DNS_PORT, "*", WifiConfigIp);
 
+  #ifdef DEBUG
   Serial.print("AP IP address: ");
   Serial.println(WifiConfigIp); 
+  #endif
 }
 
 
@@ -273,7 +292,9 @@ void startWebserver(){
   
   // Initialize SPIFFS
   if(!SPIFFS.begin(true)){
+    #ifdef DEBUG
     Serial.println("An Error has occurred while mounting SPIFFS");
+    #endif
     return;
   }
 
@@ -294,7 +315,9 @@ void startWebserver(){
     webServer.on("/save", HTTP_GET, [](AsyncWebServerRequest *request){
       if(request->hasArg("hostname"))
       {
+        #ifdef DEBUG
         Serial.println("Save wifi config");
+        #endif
         WifiSettings settings = settingsManager.getWifiSettings();
         settings.hostname = request->arg("hostname");
         settings.ssid = request->arg("ssid");
@@ -325,7 +348,9 @@ void startWebserver(){
     // =======================
     events.onConnect([](AsyncEventSourceClient *client){
       if(client->lastId()){
+        #ifdef DEBUG
         Serial.printf("Client reconnected! Last message ID it got was: %u\n", client->lastId());
+        #endif
       }
       //send event with message "ready", id current millis
       // and set reconnect delay to 1 second
@@ -372,7 +397,9 @@ void startWebserver(){
     webServer.on("/settings", HTTP_GET, [](AsyncWebServerRequest *request){
       if(request->hasArg("btnSaveSettings"))
       {
+        #ifdef DEBUG
         Serial.println("Save settings");
+        #endif
         AppSettings settings = settingsManager.getAppSettings();
         settings.mqttServer = request->arg("mqtt_server");
         settings.mqttUsername = request->arg("mqtt_username");
@@ -391,7 +418,9 @@ void startWebserver(){
     webServer.on("/pairing", HTTP_GET, [](AsyncWebServerRequest *request){
       if(request->hasArg("btnDoPairing"))
       {
+        #ifdef DEBUG
         Serial.println("Do (re)pairing");
+        #endif
         doPairing();
         request->redirect("/");  
       } else {
@@ -470,16 +499,22 @@ void startWebserver(){
 
 
 void mqttCallback(char* topic, byte* message, unsigned int length) {
+  #ifdef DEBUG
   Serial.print("Message arrived on topic: ");
   Serial.print(topic);
   Serial.print(". Message: ");
+  #endif
   String messageTemp;
   
   for (int i = 0; i < length; i++) {
+    #ifdef DEBUG
     Serial.print((char)message[i]);
+    #endif
     messageTemp += (char)message[i];
   }
+  #ifdef DEBUG
   Serial.println();
+  #endif
 
   // Check incomming message for interesting topics
   if (String(topic) == String(settingsManager.getAppSettings().mqttRootTopic) + "/ignoreTouchRing") {
@@ -547,6 +582,7 @@ void doCustomOutputs(){
 }
 #endif
 
+#ifdef DOORBELL_FEATURE
 void doDoorbell(){
   if (triggerDoorbell == true){
     triggerDoorbell = false;
@@ -560,10 +596,13 @@ void doDoorbell(){
   }
   
 }
+#endif
 
 void connectMqttClient() {
   if (!mqttClient.connected() && mqttConfigValid) {
+    #ifdef DEBUG
     Serial.print("(Re)connect to MQTT broker...");
+    #endif
     // Attempt to connect
     bool connectResult;
     
@@ -577,7 +616,10 @@ void connectMqttClient() {
 
     if (connectResult) {
       // success
+      #ifdef DEBUG
       Serial.println("connected");
+      #endif
+      notifyClients("Connected to MQTT Server.");
       // Subscribe
       mqttClient.subscribe((settingsManager.getAppSettings().mqttRootTopic + "/ignoreTouchRing").c_str(), 1); // QoS = 1 (at least once)
       mqttClient.subscribe((settingsManager.getAppSettings().mqttRootTopic + "/LedTouchRing").c_str(), 1); // QoS = 1 (at least once)
@@ -593,7 +635,7 @@ void connectMqttClient() {
         mqttConfigValid = false;
         notifyClients("Failed to connect to MQTT Server: bad credentials or not authorized. Will not try again, please check your settings.");
       } else {
-        notifyClients(String("Failed to connect to MQTT Server, rc=") + mqttClient.state() + ", try again in 30 seconds");
+        notifyClients(String("Failed to connect to MQTT Server, rc=") + mqttClient.state() + ", try again in 10 seconds");
       }
     }
   }
@@ -609,7 +651,9 @@ void doScan()
     case ScanResult::noFinger:
       // standard case, occurs every iteration when no finger touchs the sensor
       if (match.scanResult != lastMatch.scanResult) {
+        #ifdef DEBUG
         Serial.println("no finger");
+        #endif
         mqttClient.publish((String(mqttRootTopic) + "/ring").c_str(), "off");
         mqttClient.publish((String(mqttRootTopic) + "/matchId").c_str(), "-1");
         mqttClient.publish((String(mqttRootTopic) + "/matchName").c_str(), "");
@@ -624,7 +668,9 @@ void doScan()
           mqttClient.publish((String(mqttRootTopic) + "/matchId").c_str(), String(match.matchId).c_str());
           mqttClient.publish((String(mqttRootTopic) + "/matchName").c_str(), match.matchName.c_str());
           mqttClient.publish((String(mqttRootTopic) + "/matchConfidence").c_str(), String(match.matchConfidence).c_str());
+          #ifdef DEBUG
           Serial.println("MQTT message sent: Open the door!");
+          #endif
         } else {
           notifyClients("Security issue! Match was not sent by MQTT because of invalid sensor pairing! This could potentially be an attack! If the sensor is new or has been replaced by you do a (re)pairing in settings page.");
         }
@@ -634,13 +680,17 @@ void doScan()
     case ScanResult::noMatchFound:
       notifyClients(String("No Match Found (Code ") + match.returnCode + ")");
       if (match.scanResult != lastMatch.scanResult) {
+        #ifdef DOORBELL_FEATURE
         triggerDoorbell = true;
+        #endif
         //digitalWrite(doorbellOutputPin, HIGH);
         mqttClient.publish((String(mqttRootTopic) + "/ring").c_str(), "on");
         mqttClient.publish((String(mqttRootTopic) + "/matchId").c_str(), "-1");
         mqttClient.publish((String(mqttRootTopic) + "/matchName").c_str(), "");
         mqttClient.publish((String(mqttRootTopic) + "/matchConfidence").c_str(), "-1");
+        #ifdef DEBUG
         Serial.println("MQTT message sent: ring the bell!");
+        #endif
         delay(2000);
         //digitalWrite(doorbellOutputPin, LOW); 
       } else {
@@ -691,12 +741,17 @@ void reboot()
 void setup()
 {
   // open serial monitor for debug infos
+  #ifdef DEBUG
   Serial.begin(115200);
   while (!Serial);  // For Yun/Leo/Micro/Zero/...
   delay(100);
+  #endif
 
   // initialize GPIOs
+  #ifdef DOORBELL_FEATURE
   pinMode(doorbellOutputPin, OUTPUT); 
+  #endif
+
   #ifdef CUSTOM_GPIOS
     pinMode(customOutput1, OUTPUT); 
     pinMode(customOutput2, OUTPUT); 
@@ -716,13 +771,17 @@ void setup()
   {
     // ring touched during startup or no wifi settings stored -> wifi config mode
     currentMode = Mode::wificonfig;
+    #ifdef DEBUG
     Serial.println("Started WiFi-Config mode");
+    #endif
     fingerManager.setLedRingWifiConfig();
     initWiFiAccessPointForConfiguration();
     startWebserver();
 
   } else {
+    #ifdef DEBUG
     Serial.println("Started normal operating mode");
+    #endif
     currentMode = Mode::scan;
     if (initWifi()) {
       startWebserver();
@@ -735,7 +794,9 @@ void setup()
         if (WiFi.hostByName(settingsManager.getAppSettings().mqttServer.c_str(), mqttServerIp))
         {
           mqttConfigValid = true;
+          #ifdef DEBUG
           Serial.println("IP used for MQTT server: " + mqttServerIp.toString());
+          #endif
           mqttClient.setServer(mqttServerIp , 1883);
           mqttClient.setCallback(mqttCallback);
           connectMqttClient();
@@ -770,23 +831,25 @@ void loop()
   {
     unsigned long currentMillis = millis();
     // reconnect WiFi if down for 30s
-    if ((WiFi.status() != WL_CONNECTED) && (currentMillis - wifiReconnectPreviousMillis >= 30000ul)) {
+    if ((WiFi.status() != WL_CONNECTED) && (currentMillis - wifiReconnectPreviousMillis >= 10000ul)) {
+      #ifdef DEBUG
       Serial.println("Reconnecting to WiFi...");
+      #endif
       WiFi.disconnect();
       WiFi.reconnect();
       wifiReconnectPreviousMillis = currentMillis;
     }
-
+yield();
     // reconnect mqtt if down
     if (!settingsManager.getAppSettings().mqttServer.isEmpty()) {
-      if (!mqttClient.connected() && (currentMillis - mqttReconnectPreviousMillis >= 30000ul)) {
+      if (!mqttClient.connected() && (currentMillis - mqttReconnectPreviousMillis >= 10000ul)) {
         connectMqttClient();
         mqttReconnectPreviousMillis = currentMillis;
       }
       mqttClient.loop();
     }
   }
-
+yield();
 
   // do the actual loop work
   switch (currentMode)
@@ -815,7 +878,9 @@ void loop()
   if (needMaintenanceMode)
     currentMode = Mode::maintenance;
 
-doDoorbell();
+ #ifdef DOORBELL_FEATURE
+ doDoorbell();
+ #endif
 
   #ifdef CUSTOM_GPIOS
     // read custom inputs and publish by MQTT
@@ -845,6 +910,7 @@ doDoorbell();
     customInput2Value = i2;
 
   #endif  
+
 
 }
 
