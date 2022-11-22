@@ -277,7 +277,7 @@ void FingerprintManager::loadFingerListFromPrefs() {
 
 
 // Add/Enroll fingerprint
-NewFinger FingerprintManager::enrollFinger(int id, String name) {
+NewFinger FingerprintManager::enrollFinger(int id, String name, int samples = 5) {
 
   NewFinger newFinger;
   newFinger.enrollResult = EnrollResult::error;
@@ -285,11 +285,11 @@ NewFinger FingerprintManager::enrollFinger(int id, String name) {
   lastTouchState = true; // after enrollment, scan mode kicks in again. Force update of the ring light back to normal on first iteration of scan mode.
 
   
-  notifyClients(String("Enrollment for id #") + id + " started. We need to scan your finger 5 times until enrollment is completed.");
+  notifyClients(String("Enrollment for id #") + id + " started. We need to scan your finger "+ samples +" times until enrollment is completed.");
 
   
   // Repeat n times to get better resulting templates (as stated in R503 documentation up to 6 combined image samples possible, but I got an communication error when trying more than 5 samples, so dont go >5)
-  for (int nTimes=1; nTimes<=5; nTimes++)
+  for (int nTimes=1; nTimes<=samples; nTimes++)
   {
       notifyClients(String("Take #" + String(nTimes))+ " (place your finger on the sensor until led ring stops flashing, then remove it).");
 

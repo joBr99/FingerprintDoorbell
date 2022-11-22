@@ -27,6 +27,7 @@ IPAddress   WifiConfigIp(192, 168, 4, 1); // IP of access point in wifi config m
 const long  gmtOffset_sec = 0; // UTC Time
 const int   daylightOffset_sec = 0; // UTC Time
 
+const int   templateSamples = 3; //Fingerprint Samples for Template
 
 
 //#define CUSTOM_GPIOS
@@ -635,7 +636,7 @@ void connectMqttClient() {
         mqttConfigValid = false;
         notifyClients("Failed to connect to MQTT Server: bad credentials or not authorized. Will not try again, please check your settings.");
       } else {
-        notifyClients(String("Failed to connect to MQTT Server, rc=") + mqttClient.state() + ", try again in 10 seconds");
+        notifyClients(String("Failed to connect to MQTT Server, rc=") + mqttClient.state() + ", try again in 5 seconds");
       }
     }
   }
@@ -713,7 +714,7 @@ void doEnroll()
     return;
   }
 
-  NewFinger finger = fingerManager.enrollFinger(id, enrollName);
+  NewFinger finger = fingerManager.enrollFinger(id, enrollName, templateSamples);
   if (finger.enrollResult == EnrollResult::ok) {
     notifyClients("Enrollment successfull. You can now use your new finger for scanning.");
     updateClientsFingerlist(fingerManager.getFingerListAsHtmlOptionList());
@@ -831,7 +832,7 @@ void loop()
   {
     unsigned long currentMillis = millis();
     // reconnect WiFi if down for 30s
-    if ((WiFi.status() != WL_CONNECTED) && (currentMillis - wifiReconnectPreviousMillis >= 10000ul)) {
+    if ((WiFi.status() != WL_CONNECTED) && (currentMillis - wifiReconnectPreviousMillis >= 5000ul)) {
       #ifdef DEBUG
       Serial.println("Reconnecting to WiFi...");
       #endif
@@ -842,7 +843,7 @@ void loop()
 yield();
     // reconnect mqtt if down
     if (!settingsManager.getAppSettings().mqttServer.isEmpty()) {
-      if (!mqttClient.connected() && (currentMillis - mqttReconnectPreviousMillis >= 10000ul)) {
+      if (!mqttClient.connected() && (currentMillis - mqttReconnectPreviousMillis >= 5000ul)) {
         connectMqttClient();
         mqttReconnectPreviousMillis = currentMillis;
       }
