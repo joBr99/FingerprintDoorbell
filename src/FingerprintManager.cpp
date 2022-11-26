@@ -558,8 +558,8 @@ void FingerprintManager::setLedRingWifiConfig() {
 void FingerprintManager::setLedRingReady() {
   if (LedTouchRing){
   if (!ignoreTouchRing)
-    //finger.LEDcontrol(FINGERPRINT_LED_ON, 0, FINGERPRINT_LED_CYAN);
-    finger.LEDcontrol(FINGERPRINT_LED_BREATHING, 250, FINGERPRINT_LED_BLUE);	    
+    finger.LEDcontrol(FINGERPRINT_LED_ON, 0, FINGERPRINT_LED_CYAN);
+    //finger.LEDcontrol(FINGERPRINT_LED_BREATHING, 250, FINGERPRINT_LED_BLUE);	    
     else
     finger.LEDcontrol(FINGERPRINT_LED_ON, 0, FINGERPRINT_LED_BLUE); // Indicator switched off
   }
