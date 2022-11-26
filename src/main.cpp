@@ -28,7 +28,7 @@ const long  gmtOffset_sec = 0; // UTC Time
 const int   daylightOffset_sec = 0; // UTC Time
 
 const int   templateSamples = 3; //Fingerprint Samples for Template
-
+long rssi = 0.0;
 
 //#define CUSTOM_GPIOS
 #ifdef CUSTOM_GPIOS
@@ -61,7 +61,11 @@ unsigned long prevDoorbellTime = 0;
 const unsigned long doorbellTriggerTime = 1 * 1000UL; //Trigger 1000ms
 const int   doorbellOutputPin = 19; // pin connected to the doorbell (when using hardware connection instead of mqtt to ring the bell)
 #endif
-  
+
+#ifdef RSSI_STATUS  
+unsigned long prevRssiStatusTime = 0;  
+const unsigned long rssiStatusIntervall = 1 * 15000UL; //Trigger every 15 Seconds
+#endif
 
 const int logMessagesCount = 10;
 String logMessages[logMessagesCount]; // log messages, 0=most recent log message
@@ -148,6 +152,10 @@ String processor(const String& var){
     return settingsManager.getWifiSettings().hostname;
   } else if (var == "VERSIONINFO") {
     return VersionInfo;
+  } else if (var == "RSSIINFO") {
+    char rssistr[20];
+    sprintf(rssistr,"%ld",rssi);
+    return rssistr;
   } else if (var == "WIFI_SSID") {
     return settingsManager.getWifiSettings().ssid;
   } else if (var == "WIFI_PASSWORD") {
@@ -599,6 +607,24 @@ void doDoorbell(){
 }
 #endif
 
+#ifdef RSSI_STATUS
+void doRssiStatus(){
+  
+  unsigned long currentMillis = millis();
+    // send RSSI Value over MQTT every n seconds
+    if (currentMillis - prevRssiStatusTime >= rssiStatusIntervall) {      
+      prevRssiStatusTime = currentMillis;
+      rssi = WiFi.RSSI();
+      char rssistr[20];
+      sprintf(rssistr,"%ld",rssi);
+      String mqttRootTopic = settingsManager.getAppSettings().mqttRootTopic;
+      mqttClient.publish((String(mqttRootTopic) + "/rssiStatus").c_str(), rssistr);      
+    }
+    
+  
+}
+#endif
+
 void connectMqttClient() {
   if (!mqttClient.connected() && mqttConfigValid) {
     #ifdef DEBUG
@@ -836,10 +862,12 @@ void loop()
       #ifdef DEBUG
       Serial.println("Reconnecting to WiFi...");
       #endif
+      notifyClients("Reconnecting to WiFi...");
       WiFi.disconnect();
       WiFi.reconnect();
       wifiReconnectPreviousMillis = currentMillis;
     }
+
 yield();
     // reconnect mqtt if down
     if (!settingsManager.getAppSettings().mqttServer.isEmpty()) {
@@ -851,6 +879,10 @@ yield();
     }
   }
 yield();
+
+#ifdef RSSI_STATUS
+ doRssiStatus();
+#endif
 
   // do the actual loop work
   switch (currentMode)
