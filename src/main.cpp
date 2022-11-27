@@ -160,6 +160,10 @@ String processor(const String& var){
     char rssistr[20];
     sprintf(rssistr,"%ld",rssi);
     return rssistr;
+  } else if (var == "TP_SCANS") {    
+    char tpscans[5];
+    sprintf(tpscans,"%i",settingsManager.getAppSettings().tpScans);
+    return tpscans;
   } else if (var == "WIFI_SSID") {
     return settingsManager.getWifiSettings().ssid;
   } else if (var == "WIFI_PASSWORD") {
@@ -415,6 +419,7 @@ void startWebserver(){
         Serial.println("Save settings");
         #endif
         AppSettings settings = settingsManager.getAppSettings();
+        settings.tpScans = (uint16_t) request->arg("tp_scans").toInt();
         settings.mqttServer = request->arg("mqtt_server");
         settings.mqttUsername = request->arg("mqtt_username");
         settings.mqttPassword = request->arg("mqtt_password");
@@ -742,7 +747,7 @@ void doEnroll()
     return;
   }
 
-  NewFinger finger = fingerManager.enrollFinger(id, enrollName, templateSamples);
+  NewFinger finger = fingerManager.enrollFinger(id, enrollName, settingsManager.getAppSettings().tpScans);
   if (finger.enrollResult == EnrollResult::ok) {
     notifyClients("Enrollment successfull. You can now use your new finger for scanning.");
     updateClientsFingerlist(fingerManager.getFingerListAsHtmlOptionList());

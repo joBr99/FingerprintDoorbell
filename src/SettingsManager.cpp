@@ -17,6 +17,7 @@ bool SettingsManager::loadWifiSettings() {
 bool SettingsManager::loadAppSettings() {
     Preferences preferences;
     if (preferences.begin("appSettings", true)) {
+        appSettings.tpScans = preferences.getUShort("tpScans", (uint16_t) 5);
         appSettings.mqttServer = preferences.getString("mqttServer", String(""));
         appSettings.mqttUsername = preferences.getString("mqttUsername", String(""));
         appSettings.mqttPassword = preferences.getString("mqttPassword", String(""));
@@ -44,6 +45,7 @@ void SettingsManager::saveWifiSettings() {
 void SettingsManager::saveAppSettings() {
     Preferences preferences;
     preferences.begin("appSettings", false); 
+    preferences.putUShort("tpScans", appSettings.tpScans);
     preferences.putString("mqttServer", appSettings.mqttServer);
     preferences.putString("mqttUsername", appSettings.mqttUsername);
     preferences.putString("mqttPassword", appSettings.mqttPassword);

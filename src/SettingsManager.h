@@ -11,6 +11,7 @@ struct WifiSettings {
 };
 
 struct AppSettings {
+    uint16_t tpScans = 5;
     String mqttServer = "";
     String mqttUsername = "";
     String mqttPassword = "";
