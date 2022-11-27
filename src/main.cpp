@@ -13,6 +13,9 @@
 #include "SettingsManager.h"
 #include "global.h"
 
+
+
+
 enum class Mode { scan, enroll, wificonfig, maintenance };
 
 const char* VersionInfo = "0.41";
@@ -24,8 +27,9 @@ const char* WifiConfigSsid = "FingerprintDoorbell-Config"; // SSID used for WiFi
 const char* WifiConfigPassword = "12345678"; // password used for WiFi when in Access Point mode for configuration. Min. 8 chars needed!
 IPAddress   WifiConfigIp(192, 168, 4, 1); // IP of access point in wifi config mode
 
-const long  gmtOffset_sec = 0; // UTC Time
-const int   daylightOffset_sec = 0; // UTC Time
+const char TIME_ZONE[] = "MEZ-1MESZ-2,M3.5.0/02:00:00,M10.5.0/03:00:00";
+//const long  gmtOffset_sec = 1; // UTC Time
+//const int   daylightOffset_sec = 0; // UTC Time
 
 const int   templateSamples = 3; //Fingerprint Samples for Template
 long rssi = 0.0;
@@ -308,8 +312,9 @@ void startWebserver(){
   }
 
   // Init time by NTP Client
-  configTime(gmtOffset_sec, daylightOffset_sec, settingsManager.getAppSettings().ntpServer.c_str());
-  
+  //configTime(gmtOffset_sec, daylightOffset_sec, settingsManager.getAppSettings().ntpServer.c_str());
+  configTzTime(TIME_ZONE, settingsManager.getAppSettings().ntpServer.c_str());
+
   // webserver for normal operating or wifi config?
   if (currentMode == Mode::wificonfig)
   {
