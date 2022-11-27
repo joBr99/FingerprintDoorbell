@@ -609,19 +609,16 @@ void doDoorbell(){
 
 #ifdef RSSI_STATUS
 void doRssiStatus(){
-  
-  unsigned long currentMillis = millis();
-    // send RSSI Value over MQTT every n seconds
-    if (currentMillis - prevRssiStatusTime >= rssiStatusIntervall) {      
-      prevRssiStatusTime = currentMillis;
+  // send RSSI Value over MQTT every n seconds
+  unsigned long now = millis();    
+    if (now - prevRssiStatusTime >= rssiStatusIntervall) {      
+      prevRssiStatusTime = now;
       rssi = WiFi.RSSI();
-      char rssistr[20];
+      char rssistr[10];
       sprintf(rssistr,"%ld",rssi);
       String mqttRootTopic = settingsManager.getAppSettings().mqttRootTopic;
       mqttClient.publish((String(mqttRootTopic) + "/rssiStatus").c_str(), rssistr);      
-    }
-    
-  
+    }  
 }
 #endif
 
@@ -766,16 +763,16 @@ void reboot()
 
 
 void setup()
-{
-  // open serial monitor for debug infos
+{  
   #ifdef DEBUG
+  // open serial monitor for debug infos
   Serial.begin(115200);
   while (!Serial);  // For Yun/Leo/Micro/Zero/...
   delay(100);
   #endif
-
-  // initialize GPIOs
+  
   #ifdef DOORBELL_FEATURE
+  // initialize GPIOs
   pinMode(doorbellOutputPin, OUTPUT); 
   #endif
 
@@ -856,33 +853,29 @@ void loop()
   // Reconnect handling
   if (currentMode != Mode::wificonfig)
   {
-    unsigned long currentMillis = millis();
+    unsigned long now = millis();
     // reconnect WiFi if down for 30s
-    if ((WiFi.status() != WL_CONNECTED) && (currentMillis - wifiReconnectPreviousMillis >= 5000ul)) {
+    if ((WiFi.status() != WL_CONNECTED) && (now - wifiReconnectPreviousMillis >= 5000ul)) {
       #ifdef DEBUG
       Serial.println("Reconnecting to WiFi...");
       #endif
       notifyClients("Reconnecting to WiFi...");
       WiFi.disconnect();
       WiFi.reconnect();
-      wifiReconnectPreviousMillis = currentMillis;
+      wifiReconnectPreviousMillis = now;
     }
 
-yield();
     // reconnect mqtt if down
     if (!settingsManager.getAppSettings().mqttServer.isEmpty()) {
-      if (!mqttClient.connected() && (currentMillis - mqttReconnectPreviousMillis >= 5000ul)) {
+      if (!mqttClient.connected() && (now - mqttReconnectPreviousMillis >= 5000ul)) {
         connectMqttClient();
-        mqttReconnectPreviousMillis = currentMillis;
+        mqttReconnectPreviousMillis = now;
       }
       mqttClient.loop();
     }
   }
-yield();
 
-#ifdef RSSI_STATUS
- doRssiStatus();
-#endif
+
 
   // do the actual loop work
   switch (currentMode)
@@ -911,11 +904,15 @@ yield();
   if (needMaintenanceMode)
     currentMode = Mode::maintenance;
 
- #ifdef DOORBELL_FEATURE
+#ifdef RSSI_STATUS
+ doRssiStatus();
+#endif
+ 
+#ifdef DOORBELL_FEATURE
  doDoorbell();
- #endif
+#endif
 
-  #ifdef CUSTOM_GPIOS
+#ifdef CUSTOM_GPIOS
     // read custom inputs and publish by MQTT
     bool i1;
     bool i2;
@@ -941,9 +938,7 @@ yield();
 
     customInput1Value = i1;
     customInput2Value = i2;
-
-  #endif  
-
+#endif  
 
 }
 
