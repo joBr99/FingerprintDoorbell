@@ -2,12 +2,20 @@
   Main of FingerprintDoorbell 
  ****************************************************/
 
-#include <WiFi.h>
+
+
 #include <DNSServer.h>
 #include <time.h>
 #include <ESPAsyncWebServer.h>
 #include <AsyncElegantOTA.h>
-#include <SPIFFS.h>
+#if defined(ESP32)
+#include "SPIFFS.h"
+#include <WiFi.h>
+#endif
+#if defined(ESP8266)
+#include <FS.h>
+#include <ESP8266wifi.h>
+#endif
 #include <PubSubClient.h>
 #include "FingerprintManager.h"
 #include "SettingsManager.h"
@@ -15,6 +23,22 @@
 
 
 
+#if defined(ESP8266)
+bool getLocalTime(struct tm * info, uint32_t ms = 5000)
+{
+    uint32_t start = millis();
+    time_t now;
+    while((millis()-start) <= ms) {
+        time(&now);
+        localtime_r(&now, info);
+        if(info->tm_year > (2016 - 1900)){
+            return true;
+        }
+        delay(10);
+    }
+    return false;
+}
+#endif
 
 enum class Mode { scan, enroll, wificonfig, maintenance };
 
@@ -266,7 +290,14 @@ bool initWifi() {
   WifiSettings wifiSettings = settingsManager.getWifiSettings();
   WiFi.mode(WIFI_STA);
   WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE, INADDR_NONE);
+
+#if defined(ESP32)
   WiFi.setHostname(wifiSettings.hostname.c_str()); //define hostname
+#endif
+ #if defined(ESP8266)
+  WiFi.hostname(wifiSettings.hostname.c_str()); //define hostname  
+ #endif
+
   WiFi.begin(wifiSettings.ssid.c_str(), wifiSettings.password.c_str());
   int counter = 0;
   while (WiFi.status() != WL_CONNECTED) {
@@ -308,7 +339,7 @@ void initWiFiAccessPointForConfiguration() {
 void startWebserver(){
   
   // Initialize SPIFFS
-  if(!SPIFFS.begin(true)){
+  if(!SPIFFS.begin()){
     #ifdef DEBUG
     Serial.println("An Error has occurred while mounting SPIFFS");
     #endif
