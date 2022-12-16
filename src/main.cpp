@@ -13,7 +13,9 @@
 #include <WiFi.h>
 #endif
 #if defined(ESP8266)
-#include <FS.h>
+//#include <FS.h>
+#include <LITTLEFS.h>
+#define SPIFFS LittleFS
 #include <ESP8266wifi.h>
 #endif
 #include <PubSubClient.h>
@@ -299,11 +301,19 @@ bool initWifi() {
  #endif
 
   WiFi.begin(wifiSettings.ssid.c_str(), wifiSettings.password.c_str());
+    #ifdef DEBUG   
+    Serial.print("SSID: ");
+    Serial.println(wifiSettings.ssid.c_str());
+    Serial.print("PW: ");
+    Serial.println(wifiSettings.password.c_str());
+    Serial.print("HOSTNAME: ");
+    Serial.println(wifiSettings.hostname.c_str());
+    #endif
   int counter = 0;
   while (WiFi.status() != WL_CONNECTED) {
     delay(1000);
-    #ifdef DEBUG
-    Serial.println("Waiting for WiFi connection...");
+    #ifdef DEBUG   
+    Serial.println("Waiting for WiFi connection...");    
     #endif
     counter++;
     if (counter > 30)
@@ -317,7 +327,6 @@ bool initWifi() {
   #ifdef DEBUG
   Serial.println(WiFi.localIP());
   #endif
-
   return true;
 }
 
@@ -817,11 +826,17 @@ void setup()
   pinMode(doorbellOutputPin, OUTPUT); 
   #endif
 
-  #ifdef CUSTOM_GPIOS
+  #ifdef CUSTOM_GPIOS     
     pinMode(customOutput1, OUTPUT); 
-    pinMode(customOutput2, OUTPUT); 
+    pinMode(customOutput2, OUTPUT);
+    #ifdef ESP32 
     pinMode(customInput1, INPUT_PULLDOWN);
     pinMode(customInput2, INPUT_PULLDOWN);
+    #endif
+    #ifdef ESP8266
+    pinMode(customInput1);
+    pinMode(customInput2);
+    #endif
   #endif  
 
   settingsManager.loadWifiSettings();

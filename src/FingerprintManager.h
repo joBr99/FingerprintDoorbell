@@ -5,14 +5,6 @@
 #include <Preferences.h>
 #include "global.h"
 
-#ifdef ESP32
-#define mySerial Serial2
-#endif
-
-#ifdef ESP8266
-#define mySerial Serial1
-#endif
-
 #define FINGERPRINT_WRITENOTEPAD 0x18 // Write Notepad on sensor
 #define FINGERPRINT_READNOTEPAD 0x19 // Read Notepad from sensor
 
@@ -56,8 +48,7 @@ struct NewFinger {
 };
 
 class FingerprintManager {       
-  private:
-    Adafruit_Fingerprint finger = Adafruit_Fingerprint(&mySerial);
+  private:    
     bool lastTouchState = false;
     String fingerList[201];
     int fingerCountOnSensor = 0;
