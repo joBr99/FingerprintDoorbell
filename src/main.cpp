@@ -7,7 +7,9 @@
 #include <ESPAsyncWebServer.h>
 #include <AsyncElegantOTA.h>
 #if defined(ESP32)
-#include "SPIFFS.h"
+//#include "SPIFFS.h"
+#include <LITTLEFS.h>
+#define SPIFFS LittleFS  //replace spiffs
 #include <WiFi.h>
 #endif
 #if defined(ESP8266)
