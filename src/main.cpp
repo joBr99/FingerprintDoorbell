@@ -2,8 +2,6 @@
   Main of FingerprintDoorbell 
  ****************************************************/
 
-
-
 #include <DNSServer.h>
 #include <time.h>
 #include <ESPAsyncWebServer.h>
@@ -15,14 +13,13 @@
 #if defined(ESP8266)
 //#include <FS.h>
 #include <LITTLEFS.h>
-#define SPIFFS LittleFS
+#define SPIFFS LittleFS  //replace spiffs
 #include <ESP8266wifi.h>
 #endif
 #include <PubSubClient.h>
 #include "FingerprintManager.h"
 #include "SettingsManager.h"
 #include "global.h"
-
 
 
 #if defined(ESP8266)
@@ -53,7 +50,7 @@ const char* WifiConfigSsid = "FingerprintDoorbell-Config"; // SSID used for WiFi
 const char* WifiConfigPassword = "12345678"; // password used for WiFi when in Access Point mode for configuration. Min. 8 chars needed!
 IPAddress   WifiConfigIp(192, 168, 4, 1); // IP of access point in wifi config mode
 
-const char TIME_ZONE[] = "MEZ-1MESZ-2,M3.5.0/02:00:00,M10.5.0/03:00:00";
+const char TIME_ZONE[] = "MEZ-1MESZ-2,M3.5.0/02:00:00,M10.5.0/03:00:00"; //MEZ MESZ Time
 //const long  gmtOffset_sec = 1; // UTC Time
 //const int   daylightOffset_sec = 0; // UTC Time
 
@@ -291,7 +288,6 @@ bool initWifi() {
   // Connect to Wi-Fi
   WifiSettings wifiSettings = settingsManager.getWifiSettings();
   WiFi.mode(WIFI_STA);
-  WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE, INADDR_NONE);
 
 #if defined(ESP32)
   WiFi.setHostname(wifiSettings.hostname.c_str()); //define hostname
@@ -303,9 +299,7 @@ bool initWifi() {
   WiFi.begin(wifiSettings.ssid.c_str(), wifiSettings.password.c_str());
     #ifdef DEBUG   
     Serial.print("SSID: ");
-    Serial.println(wifiSettings.ssid.c_str());
-    Serial.print("PW: ");
-    Serial.println(wifiSettings.password.c_str());
+    Serial.println(wifiSettings.ssid.c_str());    
     Serial.print("HOSTNAME: ");
     Serial.println(wifiSettings.hostname.c_str());
     #endif

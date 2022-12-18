@@ -1,3 +1,4 @@
+#include "Arduino.h"
 #include "FingerprintManager.h"
 #include "global.h"
 
@@ -9,7 +10,7 @@
 
 #ifdef ESP8266
 #include <SoftwareSerial.h>
-SoftwareSerial swSer(14, 12, false);
+SoftwareSerial swSer(14, 12);
 #define mySerial swSer
 #endif
 
