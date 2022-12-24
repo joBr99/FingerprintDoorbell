@@ -7,9 +7,9 @@
 #include <ESPAsyncWebServer.h>
 #include <AsyncElegantOTA.h>
 #if defined(ESP32)
-//#include "SPIFFS.h"
-#include <LITTLEFS.h>
-#define SPIFFS LittleFS  //replace spiffs
+#include "SPIFFS.h"
+//#include <LITTLEFS.h>
+//#define SPIFFS LittleFS  //replace spiffs
 #include <WiFi.h>
 #endif
 #if defined(ESP8266)
@@ -43,7 +43,7 @@ bool getLocalTime(struct tm * info, uint32_t ms = 5000)
 
 enum class Mode { scan, enroll, wificonfig, maintenance };
 
-const char* VersionInfo = "0.41";
+const char* VersionInfo = "0.50";
 
 // ===================================================================================================================
 // Caution: below are not the credentials for connecting to your home network, they are for the Access Point mode!!!
@@ -53,8 +53,6 @@ const char* WifiConfigPassword = "12345678"; // password used for WiFi when in A
 IPAddress   WifiConfigIp(192, 168, 4, 1); // IP of access point in wifi config mode
 
 const char TIME_ZONE[] = "MEZ-1MESZ-2,M3.5.0/02:00:00,M10.5.0/03:00:00"; //MEZ MESZ Time
-//const long  gmtOffset_sec = 1; // UTC Time
-//const int   daylightOffset_sec = 0; // UTC Time
 
 const int   templateSamples = 3; //Fingerprint Samples for Template
 long rssi = 0.0;
@@ -290,14 +288,14 @@ bool initWifi() {
   // Connect to Wi-Fi
   WifiSettings wifiSettings = settingsManager.getWifiSettings();
   WiFi.mode(WIFI_STA);
-
+  //WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE, INADDR_NONE);
 #if defined(ESP32)
   WiFi.setHostname(wifiSettings.hostname.c_str()); //define hostname
 #endif
  #if defined(ESP8266)
   WiFi.hostname(wifiSettings.hostname.c_str()); //define hostname  
  #endif
-
+  
   WiFi.begin(wifiSettings.ssid.c_str(), wifiSettings.password.c_str());
     #ifdef DEBUG   
     Serial.print("SSID: ");
@@ -351,9 +349,13 @@ void startWebserver(){
     return;
   }
 
-  // Init time by NTP Client
-  //configTime(gmtOffset_sec, daylightOffset_sec, settingsManager.getAppSettings().ntpServer.c_str());
-  configTzTime(TIME_ZONE, settingsManager.getAppSettings().ntpServer.c_str());
+  // Init time by NTP Client  
+  String ntpServer = settingsManager.getAppSettings().ntpServer;
+  #ifdef DEBUG
+    Serial.print("NTP Server: ");
+    Serial.println(ntpServer);    
+  #endif  
+  configTzTime(TIME_ZONE, ntpServer.c_str());
 
   // webserver for normal operating or wifi config?
   if (currentMode == Mode::wificonfig)
@@ -836,7 +838,7 @@ void setup()
   #endif  
 
   settingsManager.loadWifiSettings();
-  settingsManager.loadAppSettings();
+  settingsManager.loadAppSettings();  
 
   fingerManager.connect();
   

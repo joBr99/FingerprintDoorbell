@@ -16,7 +16,7 @@ struct AppSettings {
     String mqttUsername = "";
     String mqttPassword = "";
     String mqttRootTopic = "fingerprintDoorbell";
-    String ntpServer = "pool.ntp.org";
+    String ntpServer = "pool.ntp.org";    
     String sensorPin = "00000000";
     String sensorPairingCode = "";
     bool   sensorPairingValid = false;
