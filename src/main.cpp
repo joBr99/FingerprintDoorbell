@@ -7,9 +7,9 @@
 #include <ESPAsyncWebServer.h>
 #include <AsyncElegantOTA.h>
 #if defined(ESP32)
-#include "SPIFFS.h"
-//#include <LITTLEFS.h>
-//#define SPIFFS LittleFS  //replace spiffs
+//#include "SPIFFS.h"
+#include <LITTLEFS.h>
+#define SPIFFS LittleFS  //replace spiffs
 #include <WiFi.h>
 #endif
 #if defined(ESP8266)
@@ -345,8 +345,8 @@ void startWebserver(){
   if(!SPIFFS.begin()){
     #ifdef DEBUG
     Serial.println("An Error has occurred while mounting SPIFFS");
-    #endif
-    return;
+    #endif    
+    //return;
   }
 
   // Init time by NTP Client  
@@ -417,7 +417,7 @@ void startWebserver(){
     
     // Route for root / web page
     webServer.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
-      request->send(SPIFFS, "/index.html", String(), false, processor);
+      request->send(SPIFFS, "/index.html", String(), false, processor);      
     });
 
     webServer.on("/enroll", HTTP_GET, [](AsyncWebServerRequest *request){
