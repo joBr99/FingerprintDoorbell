@@ -355,7 +355,7 @@ void startWebserver(){
     Serial.print("NTP Server: ");
     Serial.println(ntpServer);    
   #endif  
-  configTzTime(TIME_ZONE, ntpServer.c_str());
+  configTzTime(TIME_ZONE, ntpServer.c_str());   
 
   // webserver for normal operating or wifi config?
   if (currentMode == Mode::wificonfig)
@@ -873,9 +873,11 @@ void setup()
         {
           mqttConfigValid = true;
           #ifdef DEBUG
-          Serial.println("IP used for MQTT server: " + mqttServerIp.toString());
-          #endif
-          mqttClient.setServer(mqttServerIp , 1883);
+          //Serial.println("IP used for MQTT server: " + mqttServerIp.toString());
+          Serial.println("IP used for MQTT server: " + mqttServerIp.toString() + " | Port: " + String(settingsManager.getAppSettings().mqttPort));          
+          #endif          
+          //mqttClient.setServer(mqttServerIp , 1883);
+          mqttClient.setServer(mqttServerIp , settingsManager.getAppSettings().mqttPort);
           mqttClient.setCallback(mqttCallback);
           connectMqttClient();
         }
