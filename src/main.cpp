@@ -6,6 +6,7 @@
 #include <time.h>
 #include <ESPAsyncWebServer.h>
 #include <AsyncElegantOTA.h>
+
 #if defined(ESP32)
 //#include "SPIFFS.h"
 #include <LITTLEFS.h>
@@ -23,6 +24,13 @@
 #include "SettingsManager.h"
 #include "global.h"
 
+//KNX
+#ifdef KNXFEATURE
+#include <esp-knx-ip.h>
+address_t door1_ga = knx.GA_to_address(1, 3, 90);
+address_t door2_ga = knx.GA_to_address(1, 3, 90);
+//knx.physical_address_set(knx.PA_to_address(1, 1, 1));
+#endif
 
 #if defined(ESP8266)
 bool getLocalTime(struct tm * info, uint32_t ms = 5000)
@@ -122,6 +130,46 @@ bool mqttConfigValid = true;
 
 
 Match lastMatch;
+
+#ifdef KNXFEATURE
+
+void LED_cb(message_t const &msg, void *arg)
+{
+	//switch (ct)
+	switch (msg.ct)
+	{
+	case KNX_CT_WRITE:
+		// Do something, like a digitalWrite
+		// Or send a telegram like this:
+		//uint8_t my_msg = 42;
+		//knx.write1ByteInt(knx.config_get_ga(my_GA), my_msg);
+		break;
+	case KNX_CT_READ:
+		// Answer with a value
+		//knx.answer_2byte_float(msg.received_on, DHTtemp);
+		//delay(10);
+		//knx.answer_2byte_float(knx.config_get_ga(hum_ga), DHThum);
+		break;
+
+
+	}
+}
+
+
+void SetupKNX(){	
+		
+  callback_id_t set_LED_id = knx.callback_register("Set LED Ring on/off", LED_cb);  
+
+  // Assign callbacks to group addresses (2/1/1, 2/1/2, 2/1/3)
+  knx.callback_assign(set_LED_id, knx.GA_to_address(2, 1, 1)); 
+
+  knx.physical_address_set(knx.PA_to_address(1, 1, 1));
+
+	// Load previous values from EEPROM
+	// knx.load();
+}
+#endif
+
 
 void addLogMessage(const String& message) {
   // shift all messages in array by 1, oldest message will die
@@ -740,6 +788,9 @@ void doScan()
           mqttClient.publish((String(mqttRootTopic) + "/matchId").c_str(), String(match.matchId).c_str());
           mqttClient.publish((String(mqttRootTopic) + "/matchName").c_str(), match.matchName.c_str());
           mqttClient.publish((String(mqttRootTopic) + "/matchConfidence").c_str(), String(match.matchConfidence).c_str());
+          #ifdef KNXFEATURE
+          knx.write_1bit(door1_ga, 1);
+          #endif
           #ifdef DEBUG
           Serial.println("MQTT message sent: Open the door!");
           #endif
@@ -814,11 +865,14 @@ void setup()
 {  
   #ifdef DEBUG
   // open serial monitor for debug infos
+  
   Serial.begin(115200);
   while (!Serial);  // For Yun/Leo/Micro/Zero/...
   delay(100);
   #endif
   
+  
+
   #ifdef DOORBELL_FEATURE
   // initialize GPIOs
   pinMode(doorbellOutputPin, OUTPUT); 
@@ -890,6 +944,10 @@ void setup()
         fingerManager.setLedRingReady();              
       else
         fingerManager.setLedRingError();
+      
+      SetupKNX();
+      knx.start();
+
     }  else {
       fingerManager.setLedRingError();
       shouldReboot = true;
@@ -964,6 +1022,10 @@ void loop()
  doRssiStatus();
 #endif
  
+#ifdef KNXFEATURE 
+knx.loop();
+#endif
+
 #ifdef DOORBELL_FEATURE
  doDoorbell();
 #endif
