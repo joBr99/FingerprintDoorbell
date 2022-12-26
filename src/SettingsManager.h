@@ -10,6 +10,15 @@ struct WifiSettings {
     String hostname = "";
 };
 
+struct KNXSettings {    
+    String door1_ga = "";
+    String door2_ga = "";
+    String led_ga = "";
+    String touch_ga = "";
+
+    String knx_pa = "";    
+};
+
 struct AppSettings {
     uint16_t tpScans = 5;
     String mqttServer = "";
@@ -27,13 +36,16 @@ class SettingsManager {
   private:
     WifiSettings wifiSettings;
     AppSettings appSettings;
+    KNXSettings knxSettings;
 
     void saveWifiSettings();
     void saveAppSettings();
+    void saveKNXSettings();
 
   public:
     bool loadWifiSettings();
     bool loadAppSettings();
+    bool loadKNXSettings();
 
     WifiSettings getWifiSettings();
     void saveWifiSettings(WifiSettings newSettings);
@@ -41,10 +53,15 @@ class SettingsManager {
     AppSettings getAppSettings();
     void saveAppSettings(AppSettings newSettings);
 
+    KNXSettings getKNXSettings();
+    void saveKNXSettings(KNXSettings newSettings);
+
     bool isWifiConfigured();
+    bool isKNXConfigured();
 
     bool deleteAppSettings();
     bool deleteWifiSettings();
+    bool deleteKNXSettings();
 
     String generateNewPairingCode();
 

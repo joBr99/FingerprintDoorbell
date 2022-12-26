@@ -33,6 +33,21 @@ bool SettingsManager::loadAppSettings() {
         return false;
     }
 }
+
+bool SettingsManager::loadKNXSettings() {
+    Preferences preferences;
+    if (preferences.begin("knxSettings", true)) {
+        knxSettings.door1_ga = preferences.getString("door1_ga", String(""));
+        knxSettings.door2_ga = preferences.getString("door2_ga", String(""));        
+        knxSettings.led_ga = preferences.getString("led_ga", String(""));        
+        knxSettings.touch_ga = preferences.getString("touch_ga", String(""));        
+        knxSettings.knx_pa = preferences.getString("knx_pa", String(""));        
+        preferences.end();
+        return true;
+    } else {
+        return false;
+    }
+}
    
 void SettingsManager::saveWifiSettings() {
     Preferences preferences;
@@ -40,6 +55,17 @@ void SettingsManager::saveWifiSettings() {
     preferences.putString("ssid", wifiSettings.ssid);
     preferences.putString("password", wifiSettings.password);
     preferences.putString("hostname", wifiSettings.hostname);
+    preferences.end();
+}
+
+void SettingsManager::saveKNXSettings() {
+    Preferences preferences;
+    preferences.begin("knxSettings", false); 
+    preferences.putString("door1_ga", knxSettings.door1_ga);
+    preferences.putString("door2_ga", knxSettings.door2_ga);
+    preferences.putString("led_ga", knxSettings.led_ga);
+    preferences.putString("touch_ga", knxSettings.touch_ga);
+    preferences.putString("knx_pa", knxSettings.knx_pa);
     preferences.end();
 }
 
@@ -63,6 +89,10 @@ WifiSettings SettingsManager::getWifiSettings() {
     return wifiSettings;
 }
 
+KNXSettings SettingsManager::getKNXSettings() {
+    return knxSettings;
+}
+
 void SettingsManager::saveWifiSettings(WifiSettings newSettings) {
     wifiSettings = newSettings;
     saveWifiSettings();
@@ -84,6 +114,13 @@ bool SettingsManager::isWifiConfigured() {
         return true;
 }
 
+bool SettingsManager::isKNXConfigured() {
+    if (knxSettings.door1_ga.isEmpty() || knxSettings.knx_pa.isEmpty())
+        return false;
+    else
+        return true;
+}
+
 bool SettingsManager::deleteAppSettings() {
     bool rc;
     Preferences preferences;
@@ -98,6 +135,16 @@ bool SettingsManager::deleteWifiSettings() {
     bool rc;
     Preferences preferences;
     rc = preferences.begin("wifiSettings", false); 
+    if (rc)
+        rc = preferences.clear();
+    preferences.end();
+    return rc;
+}
+
+bool SettingsManager::deleteKNXSettings() {
+    bool rc;
+    Preferences preferences;
+    rc = preferences.begin("knxSettings", false); 
     if (rc)
         rc = preferences.clear();
     preferences.end();
