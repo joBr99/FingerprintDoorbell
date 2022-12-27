@@ -37,11 +37,11 @@ bool SettingsManager::loadAppSettings() {
 bool SettingsManager::loadKNXSettings() {
     Preferences preferences;
     if (preferences.begin("knxSettings", true)) {
-        knxSettings.door1_ga = preferences.getString("door1_ga", String(""));
-        knxSettings.door2_ga = preferences.getString("door2_ga", String(""));        
+        knxSettings.door1_ga = preferences.getString("door1_ga", String("1/3/90"));
+        knxSettings.door2_ga = preferences.getString("door2_ga", String("1/3/90"));        
         knxSettings.led_ga = preferences.getString("led_ga", String(""));        
         knxSettings.touch_ga = preferences.getString("touch_ga", String(""));        
-        knxSettings.knx_pa = preferences.getString("knx_pa", String(""));        
+        knxSettings.knx_pa = preferences.getString("knx_pa", String("1.1.1"));        
         preferences.end();
         return true;
     } else {
@@ -105,6 +105,11 @@ AppSettings SettingsManager::getAppSettings() {
 void SettingsManager::saveAppSettings(AppSettings newSettings) {
     appSettings = newSettings;
     saveAppSettings();
+}
+
+void SettingsManager::saveKNXSettings(KNXSettings newSettings) {
+    knxSettings = newSettings;
+    saveKNXSettings();
 }
 
 bool SettingsManager::isWifiConfigured() {

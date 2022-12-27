@@ -11,12 +11,12 @@ struct WifiSettings {
 };
 
 struct KNXSettings {    
-    String door1_ga = "";
-    String door2_ga = "";
+    String door1_ga = "1/3/90";
+    String door2_ga = "1/3/90";
     String led_ga = "";
     String touch_ga = "";
 
-    String knx_pa = "";    
+    String knx_pa = "1.1.1";    
 };
 
 struct AppSettings {

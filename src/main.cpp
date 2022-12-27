@@ -27,9 +27,10 @@
 //KNX
 #ifdef KNXFEATURE
 #include <esp-knx-ip.h>
-address_t door1_ga = knx.GA_to_address(1, 3, 90);
-address_t door2_ga = knx.GA_to_address(1, 3, 90);
-//knx.physical_address_set(knx.PA_to_address(1, 1, 1));
+address_t door1_ga;
+address_t door2_ga;
+address_t led_ga;
+address_t touch_ga;
 #endif
 
 #if defined(ESP8266)
@@ -155,18 +156,53 @@ void LED_cb(message_t const &msg, void *arg)
 	}
 }
 
+int getValue(String data, char separator, int index)
+{
+  int found = 0;
+  int strIndex[] = {0, -1};
+  int maxIndex = data.length()-1;
+
+  for(int i=0; i<=maxIndex && found<=index; i++){
+    if(data.charAt(i)==separator || i==maxIndex){
+        found++;
+        strIndex[0] = strIndex[1]+1;
+        strIndex[1] = (i == maxIndex) ? i+1 : i;
+    }
+  }
+  return found>index ? data.substring(strIndex[0], strIndex[1]).toInt(): -1;
+}
 
 void SetupKNX(){	
 		
+  KNXSettings knxSettings = settingsManager.getKNXSettings();
+    #ifdef DEBUG
+    Serial.print("KNX PA: ");
+    Serial.println(knxSettings.knx_pa.c_str());        
+    Serial.print("KNX Door1 GA: ");
+    Serial.println(knxSettings.door1_ga.c_str());    
+    Serial.print("KNX Door2 GA: ");
+    Serial.println(knxSettings.door2_ga.c_str());
+    #endif
+
+  knx.physical_address_set(knx.PA_to_address(
+    getValue(knxSettings.knx_pa,'.',0), 
+    getValue(knxSettings.knx_pa,'.',1), 
+    getValue(knxSettings.knx_pa,'.',2)));   
+
+  door1_ga = knx.GA_to_address(
+    getValue(knxSettings.door1_ga,'/',0), 
+    getValue(knxSettings.door1_ga,'/',1), 
+    getValue(knxSettings.door1_ga,'/',2));
+
+  door2_ga = knx.GA_to_address(
+    getValue(knxSettings.door2_ga,'/',0), 
+    getValue(knxSettings.door2_ga,'/',1), 
+    getValue(knxSettings.door2_ga,'/',2));  
+
   callback_id_t set_LED_id = knx.callback_register("Set LED Ring on/off", LED_cb);  
 
-  // Assign callbacks to group addresses (2/1/1, 2/1/2, 2/1/3)
+  // Assign callbacks to group addresses  
   knx.callback_assign(set_LED_id, knx.GA_to_address(2, 1, 1)); 
-
-  knx.physical_address_set(knx.PA_to_address(1, 1, 1));
-
-	// Load previous values from EEPROM
-	// knx.load();
 }
 #endif
 
@@ -252,6 +288,17 @@ String processor(const String& var){
     return settingsManager.getAppSettings().mqttRootTopic;
   } else if (var == "NTP_SERVER") {
     return settingsManager.getAppSettings().ntpServer;
+
+    } else if (var == "KNX_PA") {
+    return settingsManager.getKNXSettings().knx_pa;
+    } else if (var == "DOOR1_GA") {
+    return settingsManager.getKNXSettings().door1_ga;
+    } else if (var == "DOOR2_GA") {
+    return settingsManager.getKNXSettings().door2_ga;
+    } else if (var == "LED_GA") {
+    return settingsManager.getKNXSettings().led_ga;
+    } else if (var == "TOUCH_GA") {
+    return settingsManager.getKNXSettings().touch_ga;
   }
 
   return String();
@@ -516,6 +563,26 @@ void startWebserver(){
         shouldReboot = true;
       } else {
         request->send(SPIFFS, "/settings.html", String(), false, processor);
+      }
+    });
+
+    webServer.on("/knx", HTTP_GET, [](AsyncWebServerRequest *request){
+      if(request->hasArg("btnSaveSettings"))
+      {
+        #ifdef DEBUG
+        Serial.println("Save settings");
+        #endif
+        KNXSettings settings = settingsManager.getKNXSettings();        
+        settings.door1_ga = request->arg("door1_ga");
+        settings.door2_ga = request->arg("door1_ga");
+        settings.led_ga = request->arg("led_ga");
+        settings.touch_ga = request->arg("touch.ga");        
+        settings.knx_pa = request->arg("knx_pa");
+        settingsManager.saveKNXSettings(settings);
+        request->redirect("/");  
+        shouldReboot = true;
+      } else {
+        request->send(SPIFFS, "/knx.html", String(), false, processor);
       }
     });
 
@@ -861,17 +928,17 @@ void reboot()
 }
 
 
+
+
+
 void setup()
 {  
   #ifdef DEBUG
-  // open serial monitor for debug infos
-  
+  // open serial monitor for debug infos  
   Serial.begin(115200);
   while (!Serial);  // For Yun/Leo/Micro/Zero/...
   delay(100);
   #endif
-  
-  
 
   #ifdef DOORBELL_FEATURE
   // initialize GPIOs
@@ -893,6 +960,7 @@ void setup()
 
   settingsManager.loadWifiSettings();
   settingsManager.loadAppSettings();  
+  settingsManager.loadKNXSettings(); 
 
   fingerManager.connect();
   
