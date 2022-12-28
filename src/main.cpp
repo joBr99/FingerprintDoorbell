@@ -52,7 +52,7 @@ bool getLocalTime(struct tm * info, uint32_t ms = 5000)
 }
 #endif
 
-enum class Mode { scan, enroll, wificonfig, maintenance };
+enum class Mode { scan, wait, enroll, wificonfig, maintenance };
 
 const char* VersionInfo = "0.50";
 
@@ -87,14 +87,26 @@ long rssi = 0.0;
 #endif
 
 // Timer stuff Fingerprint
-  unsigned long prevFingerprintOKTime = 0;
-  unsigned long prevFingerprintFalseTime = 0;
-  const unsigned long FingerprintOKTime = 2 * 1000UL; //Trigger 2000ms
-  const unsigned long FingerprintFalseTime = 2 * 1000UL; 
+  unsigned long doorBell_starTime = 0;
+  unsigned long door1_starTime = 0;
+  unsigned long door2_starTime = 0;
+  unsigned long wait_starTime = 0;
+  const unsigned long doorBell_impulseDuration = 1 * 1000UL; 
+  const unsigned long door1_impulseDuration = 1 * 1000UL; 
+  const unsigned long door2_impulseDuration = 1 * 1000UL; 
+  const unsigned long wait_Duration = 2 * 1000UL;  
+  bool doorBell_trigger = false; 
+  bool door1_trigger = false; 
+  bool door2_trigger = false; 
+
+  //unsigned long prevFingerprintOKTime = 0;
+  //unsigned long prevFingerprintFalseTime = 0;
+  //const unsigned long FingerprintOKTime = 2 * 1000UL; //Trigger 2000ms
+  //const unsigned long FingerprintFalseTime = 2 * 1000UL; 
 
 #ifdef DOORBELL_FEATURE
 // Timer DoorBell
-bool triggerDoorbell = false;
+bool doorBell_trigger = false;
 unsigned long prevDoorbellTime = 0;  
 const unsigned long doorbellTriggerTime = 1 * 1000UL; //Trigger 1000ms
 const int   doorbellOutputPin = 19; // pin connected to the doorbell (when using hardware connection instead of mqtt to ring the bell)
@@ -811,8 +823,8 @@ void doCustomOutputs(){
 
 #ifdef DOORBELL_FEATURE
 void doDoorbell(){
-  if (triggerDoorbell == true){
-    triggerDoorbell = false;
+  if (doorBell_trigger == true){
+    doorBell_trigger = false;
     prevDoorbellTime = millis(); 
     
     #ifdef KNXFEATURE
@@ -829,6 +841,49 @@ void doDoorbell(){
   
 }
 #endif
+
+void doWait(){
+ if (wait_starTime == 0){
+  wait_starTime = millis();
+ }else if (millis() - wait_starTime >= wait_Duration){
+  wait_starTime = 0;
+  currentMode = Mode::scan;
+}
+}
+
+void doDoorbell(){
+  if (doorBell_trigger == true){
+    doorBell_trigger = false;
+    doorBell_starTime = millis();            
+    #ifdef KNXFEATURE
+      if (String(settingsManager.getKNXSettings().doorbell_ga).isEmpty() == false){
+      knx.write_1bit(doorbell_ga, 1);
+      #ifdef DEBUG
+        Serial.println("doorbell_triggered!");
+      #endif
+      }else{
+        #ifdef DEBUG
+        Serial.println("doorbell_triggered_no_GA!");
+      #endif
+      }
+    #endif
+    #ifdef CUSTOM_GPIOS
+      digitalWrite(doorbellOutputPin, HIGH);    
+    #endif
+  }  
+  
+  if (millis() - doorBell_starTime >= doorBell_impulseDuration)
+	{		
+    #ifdef KNXFEATURE
+      if (String(settingsManager.getKNXSettings().doorbell_ga).isEmpty() == false)
+      knx.write_1bit(doorbell_ga, 0);
+    #endif
+    #ifdef CUSTOM_GPIOS
+      digitalWrite(doorbellOutputPin, LOW);
+    #endif
+  }
+  
+}
 
 #ifdef RSSI_STATUS
 void doRssiStatus(){
@@ -911,6 +966,7 @@ void doScan()
         mqttClient.publish((String(mqttRootTopic) + "/matchConfidence").c_str(), "-1");
       }
       break; 
+
     case ScanResult::matchFound:
       notifyClients( String("Match Found: ") + match.matchId + " - " + match.matchName  + " with confidence of " + match.matchConfidence );
       if (match.scanResult != lastMatch.scanResult) {
@@ -944,14 +1000,13 @@ void doScan()
           notifyClients("Security issue! Match was not sent by MQTT because of invalid sensor pairing! This could potentially be an attack! If the sensor is new or has been replaced by you do a (re)pairing in settings page.");
         }
       }
-      delay(2000); // i hate delays // wait some time before next scan to let the LED blink
+      currentMode = Mode::wait; //replaces delay(2000) i hate delays // wait some time before next scan to let the LED blink
       break;
+
     case ScanResult::noMatchFound:
       notifyClients(String("No Match Found (Code ") + match.returnCode + ")");
-      if (match.scanResult != lastMatch.scanResult) {
-        #ifdef DOORBELL_FEATURE
-        triggerDoorbell = true;
-        #endif
+      if (match.scanResult != lastMatch.scanResult) {        
+        doorBell_trigger = true;        
         //digitalWrite(doorbellOutputPin, HIGH);
         mqttClient.publish((String(mqttRootTopic) + "/ring").c_str(), "on");
         mqttClient.publish((String(mqttRootTopic) + "/matchId").c_str(), "-1");
@@ -959,16 +1014,13 @@ void doScan()
         mqttClient.publish((String(mqttRootTopic) + "/matchConfidence").c_str(), "-1");
         #ifdef DEBUG
         Serial.println("MQTT message sent: ring the bell!");
-        #endif
-        #ifdef KNXFEATURE
-        knx.write_1bit(doorbell_ga, 1);
-        #endif
-        delay(2000);
-        //digitalWrite(doorbellOutputPin, LOW); 
+        #endif        
+        currentMode = Mode::wait; //replaces delay(2000) i hate delays // wait some time before next scan to let the LED blink        
       } else {
-        //delay(100); // wait some time before next scan to let the LED blink
+        
       }
       break;
+
     case ScanResult::error:
       notifyClients(String("ScanResult Error (Code ") + match.returnCode + ")");
       break;
@@ -994,8 +1046,6 @@ void doEnroll()
   }
 }
 
-
-
 void reboot()
 {
   notifyClients("System is rebooting now...");
@@ -1008,10 +1058,6 @@ void reboot()
   WiFi.disconnect();
   ESP.restart();
 }
-
-
-
-
 
 void setup()
 {  
@@ -1148,6 +1194,10 @@ void loop()
     if (fingerManager.connected)
       doScan();
     break;
+
+  case Mode::wait:
+     doWait();
+    break;
   
   case Mode::enroll:
     doEnroll();
@@ -1174,6 +1224,7 @@ void loop()
  
 #ifdef KNXFEATURE 
 knx.loop();
+doDoorbell();
 #endif
 
 #ifdef DOORBELL_FEATURE
