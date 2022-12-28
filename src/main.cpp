@@ -98,6 +98,10 @@ long rssi = 0.0;
   bool doorBell_trigger = false; 
   bool door1_trigger = false; 
   bool door2_trigger = false; 
+  bool doorBell_active = false;
+  bool door1_active = false;
+  bool door2_active = false;
+  bool wait_active = false;
 
   //unsigned long prevFingerprintOKTime = 0;
   //unsigned long prevFingerprintFalseTime = 0;
@@ -851,8 +855,9 @@ void doWait(){
 }
 }
 
-void doDoorbell(){
+void doDoorbell(){  
   if (doorBell_trigger == true){
+    doorBell_active = true;
     doorBell_trigger = false;
     doorBell_starTime = millis();            
     #ifdef KNXFEATURE
@@ -872,11 +877,20 @@ void doDoorbell(){
     #endif
   }  
   
-  if (millis() - doorBell_starTime >= doorBell_impulseDuration)
+  if ((doorBell_active == true) && (millis() - doorBell_starTime >= doorBell_impulseDuration))
 	{		
+    doorBell_active = false;
     #ifdef KNXFEATURE
-      if (String(settingsManager.getKNXSettings().doorbell_ga).isEmpty() == false)
+      if (String(settingsManager.getKNXSettings().doorbell_ga).isEmpty() == false){
       knx.write_1bit(doorbell_ga, 0);
+      #ifdef DEBUG
+        Serial.println("doorbell_triggered_end!");
+      #endif
+      }else{
+        #ifdef DEBUG
+        Serial.println("doorbell_triggered_end_no_GA!");
+      #endif
+      }
     #endif
     #ifdef CUSTOM_GPIOS
       digitalWrite(doorbellOutputPin, LOW);
