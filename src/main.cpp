@@ -29,6 +29,8 @@
 #include <esp-knx-ip.h>
 address_t door1_ga;
 address_t door2_ga;
+address_t message_ga;
+address_t doorbell_ga;
 address_t led_ga;
 address_t touch_ga;
 #endif
@@ -172,8 +174,29 @@ int getValue(String data, char separator, int index)
   return found>index ? data.substring(strIndex[0], strIndex[1]).toInt(): -1;
 }
 
-void SetupKNX(){	
-		
+bool isNumberInList(String data, char separator, int number)
+{
+  int found = 0;
+  int strIndex[] = {0, -1};
+  int maxIndex = data.length()-1;
+
+  for(int i=0; i<=maxIndex; i++){
+    if(data.charAt(i)==separator || i==maxIndex){
+        found++;
+        strIndex[0] = strIndex[1]+1;
+        strIndex[1] = (i == maxIndex) ? i+1 : i;
+        if (data.substring(strIndex[0], strIndex[1]).toInt()==number){
+          return true;
+        }
+    }
+  }
+  return false;
+}
+
+
+
+void SetupKNX(){			
+  
   KNXSettings knxSettings = settingsManager.getKNXSettings();
     #ifdef DEBUG
     Serial.print("KNX PA: ");
@@ -198,6 +221,26 @@ void SetupKNX(){
     getValue(knxSettings.door2_ga,'/',0), 
     getValue(knxSettings.door2_ga,'/',1), 
     getValue(knxSettings.door2_ga,'/',2));  
+
+  doorbell_ga = knx.GA_to_address(
+    getValue(knxSettings.doorbell_ga,'/',0), 
+    getValue(knxSettings.doorbell_ga,'/',1), 
+    getValue(knxSettings.doorbell_ga,'/',2)); 
+
+  message_ga = knx.GA_to_address(
+    getValue(knxSettings.message_ga,'/',0), 
+    getValue(knxSettings.message_ga,'/',1), 
+    getValue(knxSettings.message_ga,'/',2)); 
+
+  led_ga = knx.GA_to_address(
+    getValue(knxSettings.led_ga,'/',0), 
+    getValue(knxSettings.led_ga,'/',1), 
+    getValue(knxSettings.led_ga,'/',2)); 
+
+  touch_ga = knx.GA_to_address(
+    getValue(knxSettings.touch_ga,'/',0), 
+    getValue(knxSettings.touch_ga,'/',1), 
+    getValue(knxSettings.touch_ga,'/',2)); 
 
   callback_id_t set_LED_id = knx.callback_register("Set LED Ring on/off", LED_cb);  
 
@@ -295,10 +338,18 @@ String processor(const String& var){
     return settingsManager.getKNXSettings().door1_ga;
     } else if (var == "DOOR2_GA") {
     return settingsManager.getKNXSettings().door2_ga;
+    } else if (var == "DOORBELL_GA") {
+    return settingsManager.getKNXSettings().doorbell_ga;
+    } else if (var == "MESSAGE_GA") {
+    return settingsManager.getKNXSettings().message_ga;
     } else if (var == "LED_GA") {
     return settingsManager.getKNXSettings().led_ga;
     } else if (var == "TOUCH_GA") {
     return settingsManager.getKNXSettings().touch_ga;
+    } else if (var == "DOOR1_LIST") {
+    return settingsManager.getKNXSettings().door1_list;
+    } else if (var == "DOOR2_LIST") {
+    return settingsManager.getKNXSettings().door2_list;
   }
 
   return String();
@@ -574,10 +625,14 @@ void startWebserver(){
         #endif
         KNXSettings settings = settingsManager.getKNXSettings();        
         settings.door1_ga = request->arg("door1_ga");
-        settings.door2_ga = request->arg("door1_ga");
+        settings.door2_ga = request->arg("door2_ga");
+        settings.doorbell_ga = request->arg("doorbell_ga");
         settings.led_ga = request->arg("led_ga");
-        settings.touch_ga = request->arg("touch.ga");        
+        settings.touch_ga = request->arg("touch_ga");        
+        settings.message_ga = request->arg("message_ga");
         settings.knx_pa = request->arg("knx_pa");
+        settings.door1_list = request->arg("door1_list");
+        settings.door2_list = request->arg("door2_list");
         settingsManager.saveKNXSettings(settings);
         request->redirect("/");  
         shouldReboot = true;
@@ -759,11 +814,16 @@ void doDoorbell(){
   if (triggerDoorbell == true){
     triggerDoorbell = false;
     prevDoorbellTime = millis(); 
+    
+    #ifdef KNXFEATURE
+    knx.write_1bit(doorbell_ga, 1);
+    #endif
     digitalWrite(doorbellOutputPin, HIGH);    
   }  
   
   if (digitalRead(doorbellOutputPin) == true && (millis() - prevDoorbellTime >= doorbellTriggerTime))
 	{		
+    knx.write_1bit(doorbell_ga, 0);
     digitalWrite(doorbellOutputPin, LOW);
   }
   
@@ -833,6 +893,10 @@ void doScan()
 {
   Match match = fingerManager.scanFingerprint();
   String mqttRootTopic = settingsManager.getAppSettings().mqttRootTopic;
+  #ifdef KNXFEATURE
+  String door1List = settingsManager.getKNXSettings().door1_list;
+  String door2List = settingsManager.getKNXSettings().door2_list;
+  #endif
   switch(match.scanResult)
   {
     case ScanResult::noFinger:
@@ -856,7 +920,22 @@ void doScan()
           mqttClient.publish((String(mqttRootTopic) + "/matchName").c_str(), match.matchName.c_str());
           mqttClient.publish((String(mqttRootTopic) + "/matchConfidence").c_str(), String(match.matchConfidence).c_str());
           #ifdef KNXFEATURE
-          knx.write_1bit(door1_ga, 1);
+             if (isNumberInList(door1List, ',',match.matchId)){
+              knx.write_1bit(door1_ga, 1);
+              #ifdef DEBUG
+               Serial.println("Finger in list 1! Open the door 1!");
+              #endif
+             
+          }else if (isNumberInList(door2List, ',',match.matchId)){
+              knx.write_1bit(door2_ga, 1);
+               #ifdef DEBUG
+                Serial.println("Finger in List2! Open the door2!");
+               #endif
+          }else{
+               #ifdef DEBUG
+                Serial.println("Finger in not in List1 and List2!");
+               #endif
+          }
           #endif
           #ifdef DEBUG
           Serial.println("MQTT message sent: Open the door!");
@@ -880,6 +959,9 @@ void doScan()
         mqttClient.publish((String(mqttRootTopic) + "/matchConfidence").c_str(), "-1");
         #ifdef DEBUG
         Serial.println("MQTT message sent: ring the bell!");
+        #endif
+        #ifdef KNXFEATURE
+        knx.write_1bit(doorbell_ga, 1);
         #endif
         delay(2000);
         //digitalWrite(doorbellOutputPin, LOW); 

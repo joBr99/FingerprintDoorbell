@@ -37,11 +37,15 @@ bool SettingsManager::loadAppSettings() {
 bool SettingsManager::loadKNXSettings() {
     Preferences preferences;
     if (preferences.begin("knxSettings", true)) {
-        knxSettings.door1_ga = preferences.getString("door1_ga", String("1/3/90"));
-        knxSettings.door2_ga = preferences.getString("door2_ga", String("1/3/90"));        
+        knxSettings.door1_ga = preferences.getString("door1_ga", String(""));
+        knxSettings.door2_ga = preferences.getString("door2_ga", String(""));
+        knxSettings.doorbell_ga = preferences.getString("doorbell_ga", String(""));        
         knxSettings.led_ga = preferences.getString("led_ga", String(""));        
-        knxSettings.touch_ga = preferences.getString("touch_ga", String(""));        
-        knxSettings.knx_pa = preferences.getString("knx_pa", String("1.1.1"));        
+        knxSettings.touch_ga = preferences.getString("touch_ga", String(""));
+        knxSettings.message_ga = preferences.getString("message_ga", String(""));                
+        knxSettings.knx_pa = preferences.getString("knx_pa", String("1.1.1"));
+        knxSettings.door1_list = preferences.getString("door1_list", String(""));        
+        knxSettings.door2_list = preferences.getString("door2_list", String(""));       
         preferences.end();
         return true;
     } else {
@@ -63,9 +67,13 @@ void SettingsManager::saveKNXSettings() {
     preferences.begin("knxSettings", false); 
     preferences.putString("door1_ga", knxSettings.door1_ga);
     preferences.putString("door2_ga", knxSettings.door2_ga);
+    preferences.putString("doorbell_ga", knxSettings.doorbell_ga);
     preferences.putString("led_ga", knxSettings.led_ga);
     preferences.putString("touch_ga", knxSettings.touch_ga);
+    preferences.putString("message_ga", knxSettings.message_ga);
     preferences.putString("knx_pa", knxSettings.knx_pa);
+    preferences.putString("door1_list", knxSettings.door1_list);
+    preferences.putString("door2_list", knxSettings.door2_list);
     preferences.end();
 }
 

@@ -13,8 +13,12 @@ struct WifiSettings {
 struct KNXSettings {    
     String door1_ga = "1/3/90";
     String door2_ga = "1/3/90";
+    String doorbell_ga = "1/3/90";
+    String message_ga = "1/3/90";
     String led_ga = "";
     String touch_ga = "";
+    String door1_list = "";
+    String door2_list = "";
 
     String knx_pa = "1.1.1";    
 };
