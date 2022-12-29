@@ -79,34 +79,20 @@ long rssi = 0.0;
   bool triggerCustomOutput1 = false;
   bool triggerCustomOutput2 = false;
 
-  // Timer stuff Custom_GPIOS
-  unsigned long prevCustomOutput1Time = 0;
-  unsigned long prevCustomOutput2Time = 0;
+  // Timer stuff Custom_GPIOS  
   const unsigned long customOutput1TriggerTime = 4 * 1000UL; //Trigger 4000ms
   const unsigned long customOutput2TriggerTime = 4 * 1000UL; 
 #endif
 
-// Timer stuff Fingerprint
-  unsigned long doorBell_starTime = 0;
-  unsigned long door1_starTime = 0;
-  unsigned long door2_starTime = 0;
-  unsigned long wait_starTime = 0;
+// Timer stuff 
+  const unsigned long rssiStatusIntervall = 1 * 15000UL; //Trigger every 15 Seconds
   const unsigned long doorBell_impulseDuration = 1 * 1000UL; 
-  const unsigned long door1_impulseDuration = 1 * 1000UL; 
-  const unsigned long door2_impulseDuration = 1 * 1000UL; 
+  const unsigned long door1_impulseDuration = 2 * 1000UL; 
+  const unsigned long door2_impulseDuration = 2 * 1000UL; 
   const unsigned long wait_Duration = 2 * 1000UL;  
   bool doorBell_trigger = false; 
   bool door1_trigger = false; 
-  bool door2_trigger = false; 
-  bool doorBell_active = false;
-  bool door1_active = false;
-  bool door2_active = false;
-  bool wait_active = false;
-
-  //unsigned long prevFingerprintOKTime = 0;
-  //unsigned long prevFingerprintFalseTime = 0;
-  //const unsigned long FingerprintOKTime = 2 * 1000UL; //Trigger 2000ms
-  //const unsigned long FingerprintFalseTime = 2 * 1000UL; 
+  bool door2_trigger = false;   
 
 #ifdef DOORBELL_FEATURE
 // Timer DoorBell
@@ -114,11 +100,6 @@ bool doorBell_trigger = false;
 unsigned long prevDoorbellTime = 0;  
 const unsigned long doorbellTriggerTime = 1 * 1000UL; //Trigger 1000ms
 const int   doorbellOutputPin = 19; // pin connected to the doorbell (when using hardware connection instead of mqtt to ring the bell)
-#endif
-
-#ifdef RSSI_STATUS  
-unsigned long prevRssiStatusTime = 0;  
-const unsigned long rssiStatusIntervall = 1 * 15000UL; //Trigger every 15 Seconds
 #endif
 
 const int logMessagesCount = 10;
@@ -158,19 +139,67 @@ void LED_cb(message_t const &msg, void *arg)
 	switch (msg.ct)
 	{
 	case KNX_CT_WRITE:
-		// Do something, like a digitalWrite
+		if (msg.data[0] == 1){
+      fingerManager.setLedTouchRing(true);
+    }
+    else if (msg.data[0] == 0){
+      fingerManager.setLedTouchRing(false);
+    }
+    #ifdef DEBUG
+        Serial.println("LED Write Callback triggered!");
+        Serial.print("Value: ");
+        Serial.println(msg.data[0]);
+
+    #endif
+    // Do something, like a digitalWrite
 		// Or send a telegram like this:
 		//uint8_t my_msg = 42;
 		//knx.write1ByteInt(knx.config_get_ga(my_GA), my_msg);
 		break;
 	case KNX_CT_READ:
+    #ifdef DEBUG
+        Serial.println("LED Read Callback triggered!");
+    #endif
 		// Answer with a value
 		//knx.answer_2byte_float(msg.received_on, DHTtemp);
 		//delay(10);
 		//knx.answer_2byte_float(knx.config_get_ga(hum_ga), DHThum);
 		break;
+	}
+}
 
+void touch_cb(message_t const &msg, void *arg)
+{
+	//switch (ct)
+	switch (msg.ct)
+	{
+	case KNX_CT_WRITE:
+		if (msg.data[0] == 1){
+      fingerManager.setIgnoreTouchRing(false);
+    }
+    else if (msg.data[0] == 0){
+      fingerManager.setIgnoreTouchRing(true);
+    }
+    #ifdef DEBUG
+        Serial.println("Touch Write Callback triggered!");
+        Serial.print("Value: ");
+        Serial.println(msg.data[0]);
 
+    #endif
+    // Do something, like a digitalWrite
+		// Or send a telegram like this:
+		//uint8_t my_msg = 42;
+		//knx.write1ByteInt(knx.config_get_ga(my_GA), my_msg);
+		break;
+	case KNX_CT_READ:
+    #ifdef DEBUG
+        Serial.println("Touch Read Callback triggered!");
+    #endif
+		// Answer with a value
+		//knx.answer_2byte_float(msg.received_on, DHTtemp);
+		//delay(10);
+		//knx.answer_2byte_float(knx.config_get_ga(hum_ga), DHThum);
+		break;
 	}
 }
 
@@ -258,10 +287,19 @@ void SetupKNX(){
     getValue(knxSettings.touch_ga,'/',1), 
     getValue(knxSettings.touch_ga,'/',2)); 
 
-  callback_id_t set_LED_id = knx.callback_register("Set LED Ring on/off", LED_cb);  
+  callback_id_t set_LED_id = knx.callback_register("Set LED Ring on/off", LED_cb);
+  callback_id_t set_TOUCH_id = knx.callback_register("Set Touch Ignore on/off", touch_cb);  
 
   // Assign callbacks to group addresses  
-  knx.callback_assign(set_LED_id, knx.GA_to_address(2, 1, 1)); 
+  knx.callback_assign(set_LED_id, knx.GA_to_address(
+     getValue(knxSettings.led_ga,'/',0), 
+     getValue(knxSettings.led_ga,'/',1), 
+     getValue(knxSettings.led_ga,'/',2))); 
+
+  knx.callback_assign(set_TOUCH_id, knx.GA_to_address(
+     getValue(knxSettings.touch_ga,'/',0), 
+     getValue(knxSettings.touch_ga,'/',1), 
+     getValue(knxSettings.touch_ga,'/',2))); 
 }
 #endif
 
@@ -802,6 +840,8 @@ void mqttCallback(char* topic, byte* message, unsigned int length) {
 }
 
 #ifdef CUSTOM_GPIOS
+static unsigned long prevCustomOutput1Time = 0;
+static unsigned long prevCustomOutput2Time = 0;
 void doCustomOutputs(){
   if (triggerCustomOutput1 == true){
     triggerCustomOutput1 = false;
@@ -825,41 +865,25 @@ void doCustomOutputs(){
 }
 #endif
 
-#ifdef DOORBELL_FEATURE
-void doDoorbell(){
-  if (doorBell_trigger == true){
-    doorBell_trigger = false;
-    prevDoorbellTime = millis(); 
-    
-    #ifdef KNXFEATURE
-    knx.write_1bit(doorbell_ga, 1);
-    #endif
-    digitalWrite(doorbellOutputPin, HIGH);    
-  }  
-  
-  if (digitalRead(doorbellOutputPin) == true && (millis() - prevDoorbellTime >= doorbellTriggerTime))
-	{		
-    knx.write_1bit(doorbell_ga, 0);
-    digitalWrite(doorbellOutputPin, LOW);
-  }
-  
-}
-#endif
-
-void doWait(){
- if (wait_starTime == 0){
-  wait_starTime = millis();
- }else if (millis() - wait_starTime >= wait_Duration){
-  wait_starTime = 0;
+void doWait(unsigned long duration){  
+  static bool active = false;
+  static unsigned long starTime = 0;
+ if (active == false){
+  active = true;  
+  starTime = millis();  
+ }else if ((active == true) && (millis() - starTime >= duration)){
+  active = false;  
   currentMode = Mode::scan;
 }
 }
 
 void doDoorbell(){  
+  static bool active = false;
+  static unsigned long starTime = 0;
   if (doorBell_trigger == true){
-    doorBell_active = true;
+    active = true;    
     doorBell_trigger = false;
-    doorBell_starTime = millis();            
+    starTime = millis();            
     #ifdef KNXFEATURE
       if (String(settingsManager.getKNXSettings().doorbell_ga).isEmpty() == false){
       knx.write_1bit(doorbell_ga, 1);
@@ -875,32 +899,124 @@ void doDoorbell(){
     #ifdef CUSTOM_GPIOS
       digitalWrite(doorbellOutputPin, HIGH);    
     #endif
-  }  
-  
-  if ((doorBell_active == true) && (millis() - doorBell_starTime >= doorBell_impulseDuration))
+  }
+  if ((active == true) && (millis() - starTime >= doorBell_impulseDuration))
 	{		
-    doorBell_active = false;
+    active = false;
     #ifdef KNXFEATURE
       if (String(settingsManager.getKNXSettings().doorbell_ga).isEmpty() == false){
       knx.write_1bit(doorbell_ga, 0);
       #ifdef DEBUG
-        Serial.println("doorbell_triggered_end!");
+        Serial.println("doorBell_triggered_end!");
       #endif
       }else{
         #ifdef DEBUG
-        Serial.println("doorbell_triggered_end_no_GA!");
+        Serial.println("doorBell_triggered_end_no_GA!");
       #endif
       }
     #endif
     #ifdef CUSTOM_GPIOS
       digitalWrite(doorbellOutputPin, LOW);
     #endif
+  } 
+
+}
+
+  void doDoor1(){  
+  static bool active = false;
+  static unsigned long starTime = 0;
+  if (door1_trigger == true){
+    active = true;    
+    door1_trigger = false;
+    starTime = millis();            
+    #ifdef KNXFEATURE
+      if (String(settingsManager.getKNXSettings().door1_ga).isEmpty() == false){
+      knx.write_1bit(door1_ga, 1);
+      #ifdef DEBUG
+        Serial.println("door1_triggered!");
+      #endif
+      }else{
+        #ifdef DEBUG
+        Serial.println("door1_triggered_no_GA!");
+      #endif
+      }
+    #endif
+    #ifdef CUSTOM_GPIOS
+      digitalWrite(customOutput1, HIGH);    
+    #endif
+  }  
+  
+  if ((active == true) && (millis() - starTime >= door1_impulseDuration))
+	{		
+    active = false;
+    #ifdef KNXFEATURE
+      if (String(settingsManager.getKNXSettings().door1_ga).isEmpty() == false){
+      knx.write_1bit(door1_ga, 0);
+      #ifdef DEBUG
+        Serial.println("door1_triggered_end!");
+      #endif
+      }else{
+        #ifdef DEBUG
+        Serial.println("door1_triggered_end_no_GA!");
+      #endif
+      }
+    #endif
+    #ifdef CUSTOM_GPIOS
+      digitalWrite(customOutput1, LOW);
+    #endif
   }
   
 }
 
-#ifdef RSSI_STATUS
+void doDoor2(){  
+  static bool active = false;
+  static unsigned long starTime = 0;
+  if (door2_trigger == true){
+    active = true;    
+    door2_trigger = false;
+    starTime = millis();            
+    #ifdef KNXFEATURE
+      if (String(settingsManager.getKNXSettings().door2_ga).isEmpty() == false){
+      knx.write_1bit(door2_ga, 1);
+      #ifdef DEBUG
+        Serial.println("door2_triggered!");
+      #endif
+      }else{
+        #ifdef DEBUG
+        Serial.println("door2_triggered_no_GA!");
+      #endif
+      }
+    #endif
+    #ifdef CUSTOM_GPIOS
+      digitalWrite(customOutput2, HIGH);    
+    #endif
+  }  
+  
+  if ((active == true) && (millis() - starTime >= door2_impulseDuration))
+	{		
+    active = false;
+    #ifdef KNXFEATURE
+      if (String(settingsManager.getKNXSettings().door2_ga).isEmpty() == false){
+      knx.write_1bit(door2_ga, 0);
+      #ifdef DEBUG
+        Serial.println("door2_triggered_end!");
+      #endif
+      }else{
+        #ifdef DEBUG
+        Serial.println("door2_triggered_end_no_GA!");
+      #endif
+      }
+    #endif
+    #ifdef CUSTOM_GPIOS
+      digitalWrite(customOutput2, LOW);
+    #endif
+  }
+  
+}
+
 void doRssiStatus(){
+  static unsigned long starTime = 0;
+  static unsigned long prevRssiStatusTime = 0;  
   // send RSSI Value over MQTT every n seconds
   unsigned long now = millis();    
     if (now - prevRssiStatusTime >= rssiStatusIntervall) {      
@@ -912,7 +1028,6 @@ void doRssiStatus(){
       mqttClient.publish((String(mqttRootTopic) + "/rssiStatus").c_str(), rssistr);      
     }  
 }
-#endif
 
 void connectMqttClient() {
   if (!mqttClient.connected() && mqttConfigValid) {
@@ -991,13 +1106,13 @@ void doScan()
           mqttClient.publish((String(mqttRootTopic) + "/matchConfidence").c_str(), String(match.matchConfidence).c_str());
           #ifdef KNXFEATURE
              if (isNumberInList(door1List, ',',match.matchId)){
-              knx.write_1bit(door1_ga, 1);
+              door1_trigger = true;              
               #ifdef DEBUG
                Serial.println("Finger in list 1! Open the door 1!");
               #endif
              
           }else if (isNumberInList(door2List, ',',match.matchId)){
-              knx.write_1bit(door2_ga, 1);
+              door2_trigger = true;              
                #ifdef DEBUG
                 Serial.println("Finger in List2! Open the door2!");
                #endif
@@ -1080,16 +1195,12 @@ void setup()
   Serial.begin(115200);
   while (!Serial);  // For Yun/Leo/Micro/Zero/...
   delay(100);
-  #endif
-
-  #ifdef DOORBELL_FEATURE
-  // initialize GPIOs
-  pinMode(doorbellOutputPin, OUTPUT); 
-  #endif
+  #endif  
 
   #ifdef CUSTOM_GPIOS     
     pinMode(customOutput1, OUTPUT); 
     pinMode(customOutput2, OUTPUT);
+    pinMode(doorbellOutputPin, OUTPUT);
     #ifdef ESP32 
     pinMode(customInput1, INPUT_PULLDOWN);
     pinMode(customInput2, INPUT_PULLDOWN);
@@ -1210,7 +1321,7 @@ void loop()
     break;
 
   case Mode::wait:
-     doWait();
+     doWait(wait_Duration);
     break;
   
   case Mode::enroll:
@@ -1232,17 +1343,13 @@ void loop()
   if (needMaintenanceMode)
     currentMode = Mode::maintenance;
 
-#ifdef RSSI_STATUS
- doRssiStatus();
-#endif
+doRssiStatus();
  
 #ifdef KNXFEATURE 
 knx.loop();
 doDoorbell();
-#endif
-
-#ifdef DOORBELL_FEATURE
- doDoorbell();
+doDoor1();
+doDoor2();
 #endif
 
 #ifdef CUSTOM_GPIOS
@@ -1267,7 +1374,7 @@ doDoorbell();
           mqttClient.publish((String(mqttRootTopic) + "/customInput2").c_str(), "off");  
     }
     
-    doCustomOutputs();
+    //doCustomOutputs();
 
     customInput1Value = i1;
     customInput2Value = i2;
