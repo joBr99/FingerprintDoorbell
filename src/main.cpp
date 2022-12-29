@@ -26,7 +26,7 @@
 
 //KNX
 #ifdef KNXFEATURE
-#include <esp-knx-ip.h>
+#include "esp-knx-ip.h"
 address_t door1_ga;
 address_t door2_ga;
 address_t message_ga;
@@ -87,6 +87,10 @@ long rssi = 0.0;
 // Timer stuff 
   const unsigned long rssiStatusIntervall = 1 * 15000UL; //Trigger every 15 Seconds
   const unsigned long doorBell_impulseDuration = 1 * 1000UL; 
+  const unsigned long doorBell_blockAfterMatchDuration = 10 * 1000UL; 
+  bool doorBell_blocked = false;
+
+
   const unsigned long door1_impulseDuration = 2 * 1000UL; 
   const unsigned long door2_impulseDuration = 2 * 1000UL; 
   const unsigned long wait_Duration = 2 * 1000UL;  
@@ -149,7 +153,6 @@ void led_cb(message_t const &msg, void *arg)
         Serial.println("LED Write Callback triggered!");
         Serial.print("Value: ");
         Serial.println(msg.data[0]);
-
     #endif
     // Do something, like a digitalWrite
 		// Or send a telegram like this:
@@ -421,6 +424,21 @@ void notifyClients(String message) {
   
   String mqttRootTopic = settingsManager.getAppSettings().mqttRootTopic;
   mqttClient.publish((String(mqttRootTopic) + "/lastLogMessage").c_str(), message.c_str());
+}
+
+void notifyKNX(String message) {  
+  if (String(settingsManager.getKNXSettings().message_ga).isEmpty() == false){
+      knx.answer_14byte_string(message_ga, message.c_str());
+      #ifdef DEBUG
+        Serial.print("KNX Message: ");
+        Serial.println(message);
+      #endif
+}else{
+  #ifdef DEBUG
+        Serial.print("KNX Message (no GA): ");
+        Serial.println(message);
+      #endif
+}
 }
 
 void updateClientsFingerlist(String fingerlist) {
@@ -867,23 +885,41 @@ void doCustomOutputs(){
 
 void doWait(unsigned long duration){  
   static bool active = false;
-  static unsigned long starTime = 0;
+  static unsigned long startTime = 0;
  if (active == false){
   active = true;  
-  starTime = millis();  
- }else if ((active == true) && (millis() - starTime >= duration)){
+  startTime = millis();  
+ }else if ((active == true) && (millis() - startTime >= duration)){
   active = false;  
   currentMode = Mode::scan;
 }
 }
 
+void doDoorbellBlock(){  
+  static bool active = false;
+  static unsigned long startTime = 0;
+ if ((doorBell_blocked == true) && (active == false)){
+  #ifdef DEBUG
+        Serial.println("doorbell_blocked!");
+      #endif
+  active = true;  
+  startTime = millis();  
+ }else if ((active == true) && (millis() - startTime >= doorBell_blockAfterMatchDuration)){
+    #ifdef DEBUG
+        Serial.println("doorbell_unblocked!");
+      #endif
+  doorBell_blocked = false;
+  active = false;    
+}
+}
+
 void doDoorbell(){  
   static bool active = false;
-  static unsigned long starTime = 0;
-  if (doorBell_trigger == true){
+  static unsigned long startTime = 0;
+  if ((doorBell_trigger == true) && (doorBell_blocked == false)){
     active = true;    
     doorBell_trigger = false;
-    starTime = millis();            
+    startTime = millis();            
     #ifdef KNXFEATURE
       if (String(settingsManager.getKNXSettings().doorbell_ga).isEmpty() == false){
       knx.write_1bit(doorbell_ga, 1);
@@ -900,7 +936,7 @@ void doDoorbell(){
       digitalWrite(doorbellOutputPin, HIGH);    
     #endif
   }
-  if ((active == true) && (millis() - starTime >= doorBell_impulseDuration))
+  if ((active == true) && (millis() - startTime >= doorBell_impulseDuration))
 	{		
     active = false;
     #ifdef KNXFEATURE
@@ -924,11 +960,11 @@ void doDoorbell(){
 
   void doDoor1(){  
   static bool active = false;
-  static unsigned long starTime = 0;
+  static unsigned long startTime = 0;
   if (door1_trigger == true){
     active = true;    
     door1_trigger = false;
-    starTime = millis();            
+    startTime = millis();            
     #ifdef KNXFEATURE
       if (String(settingsManager.getKNXSettings().door1_ga).isEmpty() == false){
       knx.write_1bit(door1_ga, 1);
@@ -946,7 +982,7 @@ void doDoorbell(){
     #endif
   }  
   
-  if ((active == true) && (millis() - starTime >= door1_impulseDuration))
+  if ((active == true) && (millis() - startTime >= door1_impulseDuration))
 	{		
     active = false;
     #ifdef KNXFEATURE
@@ -970,11 +1006,11 @@ void doDoorbell(){
 
 void doDoor2(){  
   static bool active = false;
-  static unsigned long starTime = 0;
+  static unsigned long startTime = 0;
   if (door2_trigger == true){
     active = true;    
     door2_trigger = false;
-    starTime = millis();            
+    startTime = millis();            
     #ifdef KNXFEATURE
       if (String(settingsManager.getKNXSettings().door2_ga).isEmpty() == false){
       knx.write_1bit(door2_ga, 1);
@@ -992,7 +1028,7 @@ void doDoor2(){
     #endif
   }  
   
-  if ((active == true) && (millis() - starTime >= door2_impulseDuration))
+  if ((active == true) && (millis() - startTime >= door2_impulseDuration))
 	{		
     active = false;
     #ifdef KNXFEATURE
@@ -1015,7 +1051,7 @@ void doDoor2(){
 }
 
 void doRssiStatus(){
-  static unsigned long starTime = 0;
+  static unsigned long startTime = 0;
   static unsigned long prevRssiStatusTime = 0;  
   // send RSSI Value over MQTT every n seconds
   unsigned long now = millis();    
@@ -1093,11 +1129,12 @@ void doScan()
         mqttClient.publish((String(mqttRootTopic) + "/matchId").c_str(), "-1");
         mqttClient.publish((String(mqttRootTopic) + "/matchName").c_str(), "");
         mqttClient.publish((String(mqttRootTopic) + "/matchConfidence").c_str(), "-1");
-      }
+      }      
       break; 
 
     case ScanResult::matchFound:
       notifyClients( String("Match Found: ") + match.matchId + " - " + match.matchName  + " with confidence of " + match.matchConfidence );
+      doorBell_blocked = true; // block Doorbell for n seconds
       if (match.scanResult != lastMatch.scanResult) {
         if (checkPairingValid()) {
           mqttClient.publish((String(mqttRootTopic) + "/ring").c_str(), "off");
@@ -1106,19 +1143,22 @@ void doScan()
           mqttClient.publish((String(mqttRootTopic) + "/matchConfidence").c_str(), String(match.matchConfidence).c_str());
           #ifdef KNXFEATURE
              if (isNumberInList(door1List, ',',match.matchId)){
-              door1_trigger = true;              
+              door1_trigger = true;                  
+              notifyKNX( String("D1/ID") + match.matchId + "/C" + match.matchConfidence );
               #ifdef DEBUG
                Serial.println("Finger in list 1! Open the door 1!");
               #endif
              
           }else if (isNumberInList(door2List, ',',match.matchId)){
               door2_trigger = true;              
+              notifyKNX( String("D2/ID") + match.matchId + "/C" + match.matchConfidence );
                #ifdef DEBUG
                 Serial.println("Finger in List2! Open the door2!");
                #endif
           }else{
+               notifyKNX( String("xx/ID") + match.matchId + "/C" + match.matchConfidence );
                #ifdef DEBUG
-                Serial.println("Finger in not in List1 and List2!");
+                Serial.println("Finger not in List1 and List2!");
                #endif
           }
           #endif
@@ -1143,7 +1183,12 @@ void doScan()
         mqttClient.publish((String(mqttRootTopic) + "/matchConfidence").c_str(), "-1");
         #ifdef DEBUG
         Serial.println("MQTT message sent: ring the bell!");
-        #endif        
+        #endif 
+
+        #ifdef KNXFEATURE
+        notifyKNX( String("No Match: ring"));
+        #endif
+               
         currentMode = Mode::wait; //replaces delay(2000) i hate delays // wait some time before next scan to let the LED blink        
       } else {
         
@@ -1347,6 +1392,7 @@ doRssiStatus();
  
 #ifdef KNXFEATURE 
 knx.loop();
+doDoorbellBlock();
 doDoorbell();
 doDoor1();
 doDoor2();
