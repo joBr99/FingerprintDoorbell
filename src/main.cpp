@@ -133,7 +133,7 @@ Match lastMatch;
 
 #ifdef KNXFEATURE
 
-void LED_cb(message_t const &msg, void *arg)
+void led_cb(message_t const &msg, void *arg)
 {
 	//switch (ct)
 	switch (msg.ct)
@@ -287,7 +287,7 @@ void SetupKNX(){
     getValue(knxSettings.touch_ga,'/',1), 
     getValue(knxSettings.touch_ga,'/',2)); 
 
-  callback_id_t set_LED_id = knx.callback_register("Set LED Ring on/off", LED_cb);
+  callback_id_t set_LED_id = knx.callback_register("Set LED Ring on/off", led_cb);
   callback_id_t set_TOUCH_id = knx.callback_register("Set Touch Ignore on/off", touch_cb);  
 
   // Assign callbacks to group addresses  
