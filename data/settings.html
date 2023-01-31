@@ -49,7 +49,6 @@
 		  <ul class="nav navbar-nav">
 			<li><a href="/">Fingerprints</a></li>
 			<li class="active"><a href="#">Settings</a></li>
-			<li><a href="knx">KNX</a></li>
 		  </ul>
 		</div>
 	</nav>
@@ -109,6 +108,7 @@
 		<input id="mqtt_rootTopic" name="mqtt_rootTopic" type="text" placeholder="Root topic where FingerprintDoorbell publishes its messages" class="form-control input-md" value="%MQTT_ROOTTOPIC%" required>
 		<small class="text-muted">Published Topics (=write)<br>
 			- "%MQTT_ROOTTOPIC%/ring"<br>
+			- "%MQTT_ROOTTOPIC%/match"<br>
 			- "%MQTT_ROOTTOPIC%/matchId"<br>
 			- "%MQTT_ROOTTOPIC%/matchName"<br>
 			- "%MQTT_ROOTTOPIC%/matchConfidence"<br>
