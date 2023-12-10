@@ -1277,6 +1277,35 @@ void reboot()
   ESP.restart();
 }
 
+void Task1code(void *parameter)
+{
+  long lastDebounceTime = millis(); // the last time the output pin was toggled
+  long debounceDelay = 250;         // the debounce time; increase if the output flickers
+  bool lastRingState = false;
+  String mqttRootTopic = settingsManager.getAppSettings().mqttRootTopic;
+  for (;;)
+  {
+    bool reading = fingerManager.isRingTouched();
+    if (lastRingState != reading)
+      lastDebounceTime = millis();
+
+    if (reading)
+    {
+      long x = (millis() - lastDebounceTime);
+      if (x > debounceDelay)
+      {
+        fingerManager.touchRingStateFromTask = true;
+        notifyClients(String("fingerManager.touchRingStateFromTask = true ") + String(x) + " " + String(lastDebounceTime));
+      }
+    }
+    else
+    {
+      fingerManager.touchRingStateFromTask = false;
+    }
+    lastRingState = reading;
+  }
+}
+
 void setup()
 {
 #ifdef DEBUG
@@ -1367,6 +1396,16 @@ void setup()
       shouldReboot = true;
     }
   }
+
+  TaskHandle_t Task1;
+  xTaskCreatePinnedToCore(
+      Task1code, /* Function to implement the task */
+      "Task1",   /* Name of the task */
+      10000,     /* Stack size in words */
+      NULL,      /* Task input parameter */
+      0,         /* Priority of the task */
+      &Task1,    /* Task handle. */
+      0);        /* Core where the task should run */
 }
 
 void loop()

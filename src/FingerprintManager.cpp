@@ -21,7 +21,7 @@ bool FingerprintManager::connect()
 
 // initialize input pins
 #if defined(ESP32)
-  pinMode(touchRingPin, INPUT_PULLDOWN);
+  pinMode(touchRingPin, INPUT);
 #endif
 
 #if defined(ESP8266)
@@ -133,8 +133,9 @@ Match FingerprintManager::scanFingerprint()
   bool ringTouched = false;
   if (!ignoreTouchRing)
   {
-    if (isRingTouched())
-      ringTouched = true;
+    // if (isRingTouched())
+    //    ringTouched = true;
+    ringTouched = touchRingStateFromTask;
     if (ringTouched || lastTouchState)
     {
       updateTouchState(true);
@@ -610,8 +611,10 @@ void FingerprintManager::setIgnoreTouchRing(bool state)
 
 bool FingerprintManager::isRingTouched()
 {
-  if (digitalRead(touchRingPin) == LOW) // LOW = touched. Caution: touchSignal on this pin occour only once (at beginning of touching the ring, not every iteration if you keep your finger on the ring)
+  if (digitalRead(touchRingPin) == LOW)
+  { // LOW = touched. Caution: touchSignal on this pin occour only once (at beginning of touching the ring, not every iteration if you keep your finger on the ring)
     return true;
+  }
   else
     return false;
 }
